@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
-import telebot
+import telebot,config
 from re import search
-from config import *
-from telebot.types import (
-    InlineKeyboardMarkup as M,InputTextMessageContent as C,
-    InlineQueryResultPhoto as P,InlineKeyboardButton as B
-)
-bot=telebot.TeleBot(token)
+from telebot.types import InlineKeyboardMarkup as M,InputTextMessageContent as C,InlineQueryResultPhoto as P,InlineKeyboardButton as B
+bot=telebot.TeleBot(config.token)
 languages={
     'en':{
         'start':'Choose your side and get started!','bot':'Bot','don’t touch':'Oh, don’t touch this)',
-        'win':'Oh, victory!','lose':'You loooose… Try harder!','tie':'It is really tie?','new':'Start a new game?'
+        'win':'Oh, victory!','lose':'You loooose… Try harder!','tie':'It is really tie?','new':'Start a new game?',
+        'stop':'Stop! Wait your turn','stop+game':'Stop! There already playing','oh':'Oh shit!','again':'Oh, try again…',
+        'wait':'Wait your opponent to start!','start-pl-2':'Let’s go!','size':'Sorry, I can do board this size'
     },
     'ua':{
-        'start':'Обирай сторону і почнімо!','bot':'Бот','don’t touch':'Ой, не тикай сюди!',
-        'win':'О, ти переміг!','lose':'О, ні, ти програв…','tie':'Невже нічия?','new':'Зіграємо ще раз?'
+        'start':'Обирай сторону і почнімо!','bot':'Бот','don’t touch':'Ой, да не тикай сюди!',
+        'win':'О, ти переміг!','lose':'О, ні, ти програв…','tie':'Невже нічия?','new':'Зіграємо ще раз?',
+        'stop':'Стоп! Не твій хід!','stop+game':'Стоп! Тут уже грають!','oh':'Бляха…','again':'Спробуй ще раз…',
+        'wait':'Зачекай-но товариша!','start-pl-2':'Почнімо!','size':'Я не можу робити гру таких розмірів!'
     },
     'ru':{
-        'start':'Выбери сторону и начнём!','bot':'Бот','don’t touch':'Ой, не тыкай сюда!',
-        'win':'О, ты победил!','lose':'О, нет, ти проиграл…','tie':'Неужели ничья?','new':'Сыграем ещё раз?'
+        'start':'Выбери сторону и начнём!','bot':'Бот','don’t touch':'Ой, да не тыкай сюда!',
+        'win':'О, ты победил!','lose':'О, нет, ти проиграл…','tie':'Неужели ничья?','new':'Сыграем ещё раз?',
+        'stop':'Стопэ!','stop+game':'Стопэ! Здесь уже играют!','oh':'Ляя…','again':'Попробуйте ещё раз…',
+        'wait':'Подожди противника!','start-pl-2':'Начнём!','size':'Я не могу делать игры таких размеров!'
     }
 }
 f=lambda a: True if a!='❌' and a!='⭕️' else False
@@ -65,21 +67,20 @@ def setting(m):
     'Choose language to play\nОбери мову, якою гратимеш\nВыбери язык, которым будеш играть',
     reply_markup=buttons)
     for user in users:
-        if m.chat.id==user.id:
+        if m.from_user.id==user.id:
             del users[users.index(user)]
-    users.append(User(id=m.chat.id,out=out))
+    users.append(User(id=m.from_user.id,out=out))
 @bot.callback_query_handler(lambda c: search('en|ua|ru|cnl',c.data))
 def settings(c):
-    id_=c.message.chat.id
-    d=c.data
-    for user in users:
-        if id_==user.id:
-            if d=='cnl':
-                bot.edit_message_text('Canceled\nВідмінено\nОтменено',id_,u.out.message_id)
+    global users
+    for u in users:
+        if c.from_user.id==u.id:
+            if c.data=='cnl':
+                bot.edit_message_text('Canceled\nВідмінено\nОтменено',c.mesage.chat.id,u.out.message_id)
             else:
-                u=user
-                u.t=languages[d]
-                bot.edit_message_text('✔️Done\n✔️Готово\n✔️Сделано',id_,u.out.message_id)
+                if not languages[c.data]==u.t:
+                    u.t=languages[c.data]
+                bot.edit_message_text('✔️Done\n✔️Готово\n✔️Сделано',c.message.chat.id,u.out.message_id)
 @bot.message_handler(commands=['start','new','game','x','o'])
 def xotext(m):
     global games
@@ -87,7 +88,8 @@ def xotext(m):
     for user in users:
         if m.chat.id==user.id:
             tx=user.t
-    if not tx:
+    try: assert tx
+    except:
         tx=users[0].t
     t=m.text
     if t.startswith('/start') or t.startswith('/new') or t.startswith('/game'):
@@ -103,53 +105,6 @@ def xotext(m):
             buttons.add(*[B('⬜️',callback_data=f'-{i}') if i!=4 else B('❌',callback_data='-❌') for i in range(9)])
             out=bot.send_message(m.chat.id,f"❌ {tx['bot']} 👈\n⭕️ {name}",reply_markup=buttons)
             games.append(Game_text(id=m.chat.id,out=out,isX=False,start=True))
-@bot.inline_handler(lambda q: len(q.query)>0)
-def inline(q):
-    global games
-    name=q.from_user.first_name
-    buttons=M()
-    g=Game(id=q.id)
-    games.append(g)
-    t=q.query
-    if search(r'\d',t):
-        size=int(search(r'\d',t).group())
-        g.s=size
-        for i in range(g.s):
-            buttons.row(*[B('⬜️',callback_data=f'{i*g.s+j:02}') for j in range(g.s)])
-    else:
-        buttons.add(*[B('⬜️',callback_data=f'{i:02}') for i in range(9)])
-    r1=P('1'+q.id,'t.me/keklulkeklul/677','t.me/keklulkeklul/677',reply_markup=buttons,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))
-    r2=P('2'+q.id,'t.me/keklulkeklul/679','t.me/keklulkeklul/679',reply_markup=buttons,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))
-    if 'x' in t.lower():
-        g.playerX=q.from_user
-        bot.answer_inline_query(q.id,[r1])
-    elif 'o' in t.lower():
-        g.playerO=q.from_user
-        bot.answer_inline_query(q.id,[r2])
-    else:
-        bot.answer_inline_query(q.id,[r1,r2])
-@bot.chosen_inline_handler(func=lambda cr: True)
-def chosen(cr):
-    global games
-    for game in games:
-        if cr.result_id[1:]==game.id:
-            game.id=cr.inline_message_id
-            g=game
-    try: assert g
-    except:
-        games.append(Game(id=cr.inline_message_id)); g=games[-1]
-    result_id=cr.result_id[0]
-    if result_id=='1':
-        g.playerX=cr.from_user
-        g.playerO=None
-        g.p1=True
-    elif result_id=='2':
-        g.playerX=None
-        g.playerO=cr.from_user
-        g.p1=True
-    g.b=['⬜️' for i in range(g.s**2)]
-    g.queue=True
-    #except: bot.edit_message_text(inline_message_id=cr.inline_message_id,text='Ой ляя… давай щэ раз')
 @bot.callback_query_handler(lambda c: search(r'-(\d|x|o)',c.data))
 def xogame(c):
     global games
@@ -269,39 +224,95 @@ def xogame(c):
     else:
         buttons.add(*[B(g.b[i],callback_data=f'-{i}' if g.b[i]=='⬜️' else f'-{g.b[i]}') for i in range(9)])
         bot.edit_message_text(f'❌ {name0} 👈\n⭕️ {name1}',m.chat.id,g.out.message_id,reply_markup=buttons)
+@bot.inline_handler(lambda q: len(q.query)>0)
+def inline(q):
+    global games
+    name=q.from_user.first_name
+    buttons=M()
+    g=Game(id=q.id)
+    games.append(g)
+    t=q.query
+    if search(r'\d',t):
+        size=int(search(r'\d',t).group())
+        g.s=size
+        for i in range(g.s):
+            buttons.row(*[B('⬜️',callback_data=f'{i*g.s+j:02}') for j in range(g.s)])
+    else:
+        buttons.add(*[B('⬜️',callback_data=f'{i:02}') for i in range(9)])
+    r1=P('1'+q.id,'t.me/keklulkeklul/677','t.me/keklulkeklul/677',reply_markup=buttons,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))
+    r2=P('2'+q.id,'t.me/keklulkeklul/679','t.me/keklulkeklul/679',reply_markup=buttons,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))
+    if 'x' in t.lower():
+        g.playerX=q.from_user
+        bot.answer_inline_query(q.id,[r1])
+    elif 'o' in t.lower():
+        g.playerO=q.from_user
+        bot.answer_inline_query(q.id,[r2])
+    else:
+        bot.answer_inline_query(q.id,[r1,r2])
+@bot.chosen_inline_handler(func=lambda cr: True)
+def chosen(cr):
+    global games
+    for game in games:
+        if cr.result_id[1:]==game.id:
+            game.id=cr.inline_message_id
+            g=game
+    try: assert g
+    except:
+        games.append(Game(id=cr.inline_message_id)); g=games[-1]
+    result_id=cr.result_id[0]
+    if result_id=='1':
+        g.playerX=cr.from_user
+        g.playerO=None
+        g.p1=True
+    elif result_id=='2':
+        g.playerX=None
+        g.playerO=cr.from_user
+        g.p1=True
+    g.b=['⬜️' for i in range(g.s**2)]
+    g.queue=True
+    #except: bot.edit_message_text(inline_message_id=cr.inline_message_id,text='Ой ляя… давай щэ раз')
 @bot.callback_query_handler(lambda c: search(r'\d\d|❌|⭕️',c.data) and c.data[0]!='-')
 def xo(c):
-    global games
+    global games,users
     for game in games:
         if c.inline_message_id==game.id:
             g=game
+    try: assert g
+    except:
+        games.append(Game(id=c.inline_message_id)); g=games[-1]
+    for user in users:
+        if c.from_user.id==user.id:
+            t=user.t
+    try: assert t
+    except:
+        t=users[0].t
     if g.p1 and g.p2:
         if g.playerX.id==c.from_user.id:
             g.call[1]=c
             if g.queue:
-                game_xo(g,c,g.playerX)
+                game_xo(g,c,g.playerX,t)
             else:
-                bot.answer_callback_query(c.id,text='Стопэ')
+                bot.answer_callback_query(c.id,text=t['stop'])
         elif g.playerO.id==c.from_user.id:
             g.call[0]=c
             if not g.queue:
-                game_xo(g,c,g.playerO)
+                game_xo(g,c,g.playerO,t)
             else:
-                bot.answer_callback_query(c.id,text='Стопэ')
+                bot.answer_callback_query(c.id,text=t['stop'])
         else:
-            bot.answer_callback_query(c.id,text='Стопэ, тут вже граютб')
+            bot.answer_callback_query(c.id,text=t['stop+game'])
     else:
         try:
             if g.playerO and c.from_user.id!=g.playerO.id:
                 g.playerX=c.from_user
                 g.p2=True
-                bot.answer_callback_query(c.id,text='Почнімо!')
+                bot.answer_callback_query(c.id,text=t['start-pl-2'])
             elif g.playerX and c.from_user.id!=g.playerX.id:
                 g.playerO=c.from_user
                 g.p2=True
-                bot.answer_callback_query(c.id,text='Почнімо!')
+                bot.answer_callback_query(c.id,text=t['start-pl-2'])
             else:
-                bot.answer_callback_query(c.id,text='Зачекай товариша!')
+                bot.answer_callback_query(c.id,text=t['wait'])
             if g.p2:
                 buttons=M()
                 if 9>g.s>2:
@@ -309,13 +320,13 @@ def xo(c):
                         buttons.row(*[B('⬜️',callback_data=f'{i*g.s+j:02}') for j in range(g.s)])
                     bot.edit_message_text(inline_message_id=c.inline_message_id,text=f'❌ {g.playerX.first_name} 👈\n⭕️ {g.playerO.first_name}',reply_markup=buttons)
                 else:
-                    bot.answer_callback_query(c.id,text='От халепа!')
-                    bot.edit_message_text(inline_message_id=c.inline_message_id,text='Я не можу робити ігри таких розмірів!')
+                    bot.answer_callback_query(c.id,text=t['oh'])
+                    bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['size'])
         except:
-            bot.answer_callback_query(c.id,text='Ляяя…')
-            bot.edit_message_text(inline_message_id=c.inline_message_id,text='Ой ляя… давай щэ раз')
+            bot.answer_callback_query(c.id,text=t['oh'])
+            bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
 
-def game_xo(g,c,pl1):
+def game_xo(g,c,pl1,t):
     name0=g.playerX.first_name
     name1=g.playerO.first_name
     if f(c.data):
@@ -353,8 +364,8 @@ def game_xo(g,c,pl1):
             sign_0,sign_1 = ['🏆','☠️'] if g.queue else ['☠️','🏆']
             buttons.add(B('❌',switch_inline_query_current_chat='x'+str(g.s)),B(text='⭕️',switch_inline_query_current_chat='o'+str(g.s)))
             bot.edit_message_text(inline_message_id=c.inline_message_id,text=g.b_text+f'\n❌ {name0} '+sign_0+f'\n⭕️ {name1} '+sign_1,reply_markup=buttons)
-            bot.answer_callback_query(g.call[g.queue].id,text='Ти виграв, файно!')
-            bot.answer_callback_query(g.call[not g.queue].id,text='Ти програв, не файно…')
+            bot.answer_callback_query(g.call[g.queue].id,text=t['win'])
+            bot.answer_callback_query(g.call[not g.queue].id,text=t['lose'])
             del games[games.index(g)]
         elif not '⬜️' in g.b:
             g.b_text=''
@@ -364,8 +375,8 @@ def game_xo(g,c,pl1):
                 g.b_text+='\n'
             buttons.add(B('❌',switch_inline_query_current_chat='x'+str(g.s)),B(text='⭕️',switch_inline_query_current_chat='o'+str(g.s)))
             bot.edit_message_text(inline_message_id=c.inline_message_id,text=g.b_text+f'\n❌ {name0} 🤛🤜 {name1} ⭕️',reply_markup=buttons)
-            bot.answer_callback_query(g.call[0].id,text='Невже нічия?')
-            bot.answer_callback_query(g.call[1].id,text='Невже нічия?')
+            bot.answer_callback_query(g.call[0].id,text=t['tie'])
+            bot.answer_callback_query(g.call[1].id,text=t['tie'])
             del games[games.index(g)]
         else:
             g.queue=not g.queue
