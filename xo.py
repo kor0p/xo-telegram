@@ -103,12 +103,12 @@ def xotext(m):
             buttons.add(*[B('⬜️',callback_data=f'-{i}') if i!=4 else B('❌',callback_data='-❌') for i in range(9)])
             out=bot.send_message(m.chat.id,f"❌ {tx['bot']} 👈\n⭕️ {name}",reply_markup=buttons)
             games.append(Game_text(id=m.chat.id,out=out,isX=False,start=True))
-@bot.inline_handler(lambda q: q.query)
+@bot.inline_handler(lambda q: len(q.query)>0)
 def inline(q):
     global games
     name=q.from_user.first_name
     buttons=M()
-    g=Game(id=q.query)
+    g=Game(id=q.id)
     games.append(g)
     t=q.query
     if search(r'\d',t):
@@ -118,8 +118,8 @@ def inline(q):
             buttons.row(*[B('⬜️',callback_data=f'{i*g.s+j:02}') for j in range(g.s)])
     else:
         buttons.add(*[B('⬜️',callback_data=f'{i:02}') for i in range(9)])
-    r1=P('1','t.me/keklulkeklul/677','t.me/keklulkeklul/677',reply_markup=buttons,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))
-    r2=P('2','t.me/keklulkeklul/679','t.me/keklulkeklul/679',reply_markup=buttons,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))
+    r1=P('1'+q.id,'t.me/keklulkeklul/677','t.me/keklulkeklul/677',reply_markup=buttons,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))
+    r2=P('2'+q.id,'t.me/keklulkeklul/679','t.me/keklulkeklul/679',reply_markup=buttons,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))
     if 'x' in t.lower():
         g.playerX=q.from_user
         bot.answer_inline_query(q.id,[r1])
@@ -131,40 +131,41 @@ def inline(q):
 @bot.chosen_inline_handler(func=lambda cr: True)
 def chosen(cr):
     global games
-    try:
-        for game in games:
-            if cr.query==game.id:
-                game.id=cr.inline_message_id
-                g=game
-        if cr.result_id=='1':
-            g.playerX=cr.from_user
-            g.playerO=None
-            g.p1=True
-        elif cr.result_id=='2':
-            g.playerX=None
-            g.playerO=cr.from_user
-            g.p1=True
-        g.b=['⬜️' for i in range(g.s**2)]
-        g.queue=True
+    for game in games:
+        if cr.result_id[1:]==game.id:
+            game.id=cr.inline_message_id
+            g=game
+    try: assert g
     except:
-        bot.edit_message_text(inline_message_id=cr.inline_message_id,text='Ой ляя… давай щэ раз')
+        games.append(Game(id=cr.inline_message_id)); g=games[-1]
+    result_id=cr.result_id[0]
+    if result_id=='1':
+        g.playerX=cr.from_user
+        g.playerO=None
+        g.p1=True
+    elif result_id=='2':
+        g.playerX=None
+        g.playerO=cr.from_user
+        g.p1=True
+    g.b=['⬜️' for i in range(g.s**2)]
+    g.queue=True
+    #except: bot.edit_message_text(inline_message_id=cr.inline_message_id,text='Ой ляя… давай щэ раз')
 @bot.callback_query_handler(lambda c: search(r'-(\d|x|o)',c.data))
 def xogame(c):
     global games
     m=c.message
-    t=False
-    for game in games:
-        if m.chat.id==game.id:
-            g=game
     for user in users:
         if m.chat.id==user.id:
             t=user.t
-    if not t:
-        t=users[0].t
-    try:
-        g=g
+    try: assert t
     except:
-        return 0
+        t=users[0].t
+    for game in games:
+        if m.chat.id==game.id:
+            g=game
+    try: assert g
+    except:
+        games.append(Game(id=c.inline_message_id)); g=games[-1]
     buttons=M()
     sign,my_sign=['❌','⭕️'] if g.isX else ['⭕️','❌']
     if g.start:
@@ -294,14 +295,16 @@ def xo(c):
             if g.playerO and c.from_user.id!=g.playerO.id:
                 g.playerX=c.from_user
                 g.p2=True
+                bot.answer_callback_query(c.id,text='Почнімо!')
             elif g.playerX and c.from_user.id!=g.playerX.id:
                 g.playerO=c.from_user
                 g.p2=True
+                bot.answer_callback_query(c.id,text='Почнімо!')
             else:
                 bot.answer_callback_query(c.id,text='Зачекай товариша!')
             if g.p2:
                 buttons=M()
-                if 9>=g.s>=3:
+                if 9>g.s>2:
                     for i in range(g.s):
                         buttons.row(*[B('⬜️',callback_data=f'{i*g.s+j:02}') for j in range(g.s)])
                     bot.edit_message_text(inline_message_id=c.inline_message_id,text=f'❌ {g.playerX.first_name} 👈\n⭕️ {g.playerO.first_name}',reply_markup=buttons)
@@ -334,7 +337,7 @@ def game_xo(g,c,pl1):
                 if g.win: break
             for i in range(g.s-3):
                 for j in range(g.s-3):
-                    for l in range(g.s-1):
+                    for l in range(4):
                         k=i+j*g.s
                         if g.b[k+l*g.s]==g.b[k+l*g.s+1]==g.b[k+l*g.s+2]==g.b[k+l*g.s+3]==s or g.b[k+l]==g.b[k+l+g.s]==g.b[k+l+g.s*2]==g.b[k+l+g.s*3]==s:
                             g.win=True; break
