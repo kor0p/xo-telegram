@@ -1,8 +1,32 @@
 # -*- coding: utf-8 -*-
-import telebot,config
+import telebot,cherrypy
+from config import token,ip_address,port
 from re import search
+from time import mktime
 from telebot.types import InlineKeyboardMarkup as M,InputTextMessageContent as C,InlineQueryResultPhoto as P,InlineQueryResultGif as G,InlineKeyboardButton as B
-bot=telebot.TeleBot(config.token)
+bot=telebot.TeleBot(token)
+WEBHOOK_HOST = ip_address
+WEBHOOK_PORT = port  # 443, 80, 88 or 8443 port must be open; I use 8443
+WEBHOOK_LISTEN = '0.0.0.0' # on some servers need to be as WEBHOOK_HOST
+WEBHOOK_SSL_CERT = '../webhook/webhook_cert.pem'
+WEBHOOK_SSL_PRIV = '../webhook/webhook_pkey.pem'
+WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
+WEBHOOK_URL_PATH = "/%s/" % token
+
+bot = telebot.TeleBot(token)
+class WebhookServer(object):
+    @cherrypy.expose
+    def index(self):
+        if 'content-length' in cherrypy.request.headers and \
+                        'content-type' in cherrypy.request.headers and \
+                        cherrypy.request.headers['content-type'] == 'application/json':
+            length = int(cherrypy.request.headers['content-length'])
+            json_string = cherrypy.request.body.read(length).decode("utf-8")
+            update = telebot.types.Update.de_json(json_string)
+            bot.process_new_updates([update])
+            return ''
+        else:
+            raise cherrypy.HTTPError(403)
 languages={
     'en':{
         'start':'Choose your side and get started!','bot':'Bot','don’t touch':'Oh, don’t touch this)',
@@ -85,8 +109,6 @@ def game_xo(g,c,pl1,t):
 def my_choice_func(b,msgn,sgn):
     if not ('⬜️' in b):
         return -1
-    if f(b[4]):
-        return 4
     for s in [msgn,sgn]:
         for i in range(3):
             for x,y,z in [[3*i,3*i+1,3*i+2],[i,i+3,i+6]]:
@@ -95,24 +117,21 @@ def my_choice_func(b,msgn,sgn):
         for x,y,z in [[0,4,8],[2,4,6]]:
             res=fo(b,x,y,z,s)
             if res>-1: return res
-    for i,j,r in [(1,3,0),(1,5,2),(3,7,6),(5,7,8),(2,3,1),(0,5,1),(3,8,7),(5,6,7),(1,6,3),(1,8,5),(0,7,3),(2,7,5)]:
+    for i,j,r in [(1,3,0),(1,5,2),(3,7,6),(5,7,8),(2,6,1),(0,8,1),(5,7,8),(2,3,1),(0,5,1),(3,8,7),(5,6,7),(1,6,3),(1,8,5),(0,7,3),(2,7,5)]:
             if b[i]==b[j]==sgn and f(b[r]):
                 return r
-    for i in [0,2,6,8]:
+    for i in range(9):
         if f(b[i]):
             return i
-    my_c=choice
-    while not f(b[my_c]):
-        my_c=(my_c+1)%9
-    return my_c
 class User:
     def __init__(self,id,language='en',out=False):
         self.id=id
         self.t=languages[language]
         self.out=out
 class Game_text:
-    def __init__(self,out,id,isX=False,board=[],start=None,turn=-1):
+    def __init__(self,out,time,id,isX=False,board=[],start=None,turn=-1):
         self.out=out
+        self.time=time
         self.id=id
         self.isX=isX
         self.b=board
@@ -120,9 +139,10 @@ class Game_text:
         self.turn=turn
 class Game:
     call=[0,0]
-    p1=p2=False
-    def __init__(self,id,playerX=None,playerO=None,queue=None,b=[],size=3):
+    p2=False
+    def __init__(self,id,time=0,playerX=None,playerO=None,queue=None,b=[],size=3):
         self.id=id
+        self.time=time
         self.playerX=playerX
         self.playerO=playerO
         self.queue=queue
@@ -163,20 +183,24 @@ def xotext(m):
     try: assert tx
     except:
         tx=users[0].t
+    for game in games:
+        if m.chat.id==game.id:
+            bot.edit_message_text(m.chat.id,game.out.message_id,'♻️')
     t=m.text
     if t.startswith('/start') or t.startswith('/new') or t.startswith('/game'):
         bot.send_message(m.chat.id,tx['start']+'\n             /x                        /o')
     else:
         buttons=M()
         name=m.from_user.first_name if m.from_user.first_name else 'None'
+        now=mktime(datetime.now().timetuple())
         if 'x' in t:
             buttons.add(*[B('⬜️',callback_data=f'-{i}') for i in range(9)])
             out=bot.send_message(m.chat.id,f"❌ {name} 👈\n⭕️ {tx['bot']}",reply_markup=buttons)
-            text_games.append(Game_text(id=m.chat.id,out=out,isX=True,start=False,turn=1,board=['⬜️']*9))
+            text_games.append(Game_text(id=m.chat.id,out=out,time=now,isX=True,board=['⬜️']*9))
         elif 'o' in t:
             buttons.add(*[B('⬜️',callback_data=f'-{i}') if i!=4 else B('❌',callback_data='-❌') for i in range(9)])
             out=bot.send_message(m.chat.id,f"❌ {tx['bot']} 👈\n⭕️ {name}",reply_markup=buttons)
-            text_games.append(Game_text(id=m.chat.id,out=out,isX=False,start=True))
+            text_games.append(Game_text(id=m.chat.id,out=out,time=now,isX=False,board=['⬜️' if i!=4 else '❌' for i in range(9)]))
 @bot.callback_query_handler(lambda c: search(r'-(\d|x|o)',c.data))
 def xogame(c):
     global text_games
@@ -194,13 +218,9 @@ def xogame(c):
             g=game
     try: assert g
     except:
-        bot.delete_message(m.chat.id,m.message_id)
+        bot.edit_message_text(m.chat.id,m.message_id,'♻️')
         return bot.answer_callback_query(c.id,text=t['don’t touch'])
     sign,my_sign=['❌','⭕️'] if g.isX else ['⭕️','❌']
-    if g.start:
-        g.b=['⬜️' if i!=4 else '❌' for i in range(9)]
-        g.start=False
-        g.turn=2
     try:
         if search('\d',c.data[1]):
             choice=int(c.data[1])
@@ -212,8 +232,7 @@ def xogame(c):
         bot.answer_callback_query(c.id,t['don’t touch'])
         return 0
     my_choice=my_choice_func(g.b,my_sign,sign)
-    if f(g.b[4]):
-        my_choice=4
+    if f(g.b[4]): my_choice=4
     g.turn+=1
     if my_choice>-1:
         g.b[my_choice]=my_sign
@@ -255,7 +274,7 @@ def xogame(c):
 def inline(q):
     global games
     name=q.from_user.first_name
-    g=Game(id=q.id)
+    g=Game(id=q.id,time=mktime(datetime.now().timetuple()))
     games.append(g)
     t=q.query; a=b=0
     x=[]; o=[]; results=[]
@@ -303,11 +322,11 @@ def chosen(cr):
         g.playerX=cr.from_user
     elif result_id=='2':
         g.playerO=cr.from_user
-    g.p1=True
     g.s=int(cr.result_id[1])
     if not g.s: g.s=3
     g.b=['⬜️' for i in range(g.s**2)]
     g.queue=True
+    g.time=mktime(datetime.now().timetuple())
 @bot.callback_query_handler(lambda c: search(r'\d\d|❌|⭕️',c.data) and c.data[0]!='-')
 def xo(c):
     global games,users
@@ -323,7 +342,7 @@ def xo(c):
     try: assert t
     except:
         t=users[0].t
-    if g.p1 and g.p2:
+    if g.p2:
         if g.playerX.id==c.from_user.id:
             g.call[1]=c
             if g.queue:
@@ -362,6 +381,20 @@ def xo(c):
         except:
             bot.answer_callback_query(c.id,text=t['oh'])
             bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
-
-if __name__ == '__main__':
-    bot.polling(none_stop=True)
+for game,game_text in games,text_games:
+    if mktime(datetime.now().timetuple())-game.time>=600:
+        bot.edit_message_text(inline_message_id=game.id,'⌛️')
+        del games[games.index(game)]
+    if mktime(datetime.now().timetuple())-game_text.time>=600:
+        bot.edit_message_text(game_text.chat.id,game_text.message_id,'⌛️')
+        del text_games[text_games.index(game_text)]
+bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,certificate=open(WEBHOOK_SSL_CERT, 'r'))
+cherrypy.config.update({
+    'server.socket_host': WEBHOOK_LISTEN,
+    'server.socket_port': WEBHOOK_PORT,
+    'server.ssl_module': 'builtin',
+    'server.ssl_certificate': WEBHOOK_SSL_CERT,
+    'server.ssl_private_key': WEBHOOK_SSL_PRIV
+})
+cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
