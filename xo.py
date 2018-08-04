@@ -383,7 +383,7 @@ def xo(c):
             bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
 for game,game_text in games,text_games:
     if mktime(datetime.now().timetuple())-game.time>=600:
-        bot.edit_message_text(inline_message_id=game.id,'⌛️')
+        bot.edit_message_text(inline_message_id=game.id,text='⌛️')
         del games[games.index(game)]
     if mktime(datetime.now().timetuple())-game_text.time>=600:
         bot.edit_message_text(game_text.chat.id,game_text.message_id,'⌛️')
