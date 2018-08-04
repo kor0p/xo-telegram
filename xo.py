@@ -381,10 +381,11 @@ def xo(c):
         except:
             bot.answer_callback_query(c.id,text=t['oh'])
             bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
-for game,game_text in games,text_games:
+for game in games:
     if mktime(datetime.now().timetuple())-game.time>=600:
         bot.edit_message_text(inline_message_id=game.id,text='⌛️')
         del games[games.index(game)]
+for game_text in text_games:
     if mktime(datetime.now().timetuple())-game_text.time>=600:
         bot.edit_message_text(game_text.chat.id,game_text.message_id,'⌛️')
         del text_games[text_games.index(game_text)]
