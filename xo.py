@@ -229,7 +229,6 @@ def xogame(c):
         return 0
     my_choice=my_choice_func(g.b,my_sign,sign)
     if f(g.b[4]): my_choice=4
-    g.turn+=1
     if my_choice>-1:
         g.b[my_choice]=my_sign
     name0 = player if g.isX else t['bot']
