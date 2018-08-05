@@ -368,7 +368,7 @@ def xo(c):
             bot.answer_callback_query(c.id,text=t['start-pl-2'])
         else:
             bot.answer_callback_query(c.id,text=t['wait'])
-        except:
+    except:
         bot.answer_callback_query(c.id,text=t['oh'])
         bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
 @bot.message_handler(content_types=['text'])
