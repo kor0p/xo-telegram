@@ -371,7 +371,7 @@ def xo(c):
         bot.answer_callback_query(c.id,text=t['oh'])
         bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
 @bot.message_handler(content_types=['text'])
-def text_messages():
+def text_messages(m):
     global games,text_games
     for game in games:
         if mktime(datetime.now().timetuple())-game.time>=600:
