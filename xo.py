@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import telebot,cherrypy
 from config import token,ip_address,port
-from datetime import datetime
 from re import search
+from datetime import datetime
 from time import mktime
 from telebot.types import InlineKeyboardMarkup as M,InputTextMessageContent as C,InlineQueryResultPhoto as P,InlineQueryResultGif as G,InlineKeyboardButton as B
 bot=telebot.TeleBot(token)
@@ -14,7 +14,6 @@ WEBHOOK_SSL_PRIV = '../webhook/webhook_pkey.pem'
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_URL_PATH = "/%s/" % token
 
-bot = telebot.TeleBot(token)
 class WebhookServer(object):
     @cherrypy.expose
     def index(self):
@@ -46,8 +45,7 @@ languages={
         'win':'О, ты победил!','lose':'О, нет, ти проиграл…','tie':'Неужели ничья?','new':'Сыграем ещё раз?',
         'stop':'Стопэ!','stop+game':'Стопэ! Здесь уже играют!','oh':'Ляя…','again':'Попробуйте ещё раз…',
         'wait':'Подожди противника!','start-pl-2':'Начнём!','size':'Я не могу делать игры таких размеров!'
-    }
-}
+    }}
 f=lambda a: True if a!='❌' and a!='⭕️' else False
 fo = lambda b,x,y,z,s: z if b[x]==b[y]==s and f(b[z]) else y if b[x]==b[z]==s and f(b[y]) else x if b[y]==b[z]==s and f(b[x]) else -1
 def winxo(b,s,sz):
@@ -130,17 +128,14 @@ class User:
         self.t=languages[language]
         self.out=out
 class Game_text:
-    def __init__(self,out,time,id,isX=False,board=[],start=None,turn=-1):
+    def __init__(self,out,time,id,isX=False,board=[]):
         self.out=out
         self.time=time
         self.id=id
         self.isX=isX
         self.b=board
-        self.start=start
-        self.turn=turn
 class Game:
     call=[0,0]
-    p2=False
     def __init__(self,id,time=0,playerX=None,playerO=None,queue=None,b=[],size=3):
         self.id=id
         self.time=time
@@ -219,7 +214,7 @@ def xogame(c):
             g=game
     try: assert g
     except:
-        bot.edit_message_text(m.chat.id,m.message_id,'♻️')
+        bot.edit_message_text(m.from_user.id,m.message_id,'♻️')
         return bot.answer_callback_query(c.id,text=t['don’t touch'])
     sign,my_sign=['❌','⭕️'] if g.isX else ['⭕️','❌']
     try:
@@ -343,7 +338,7 @@ def xo(c):
     try: assert t
     except:
         t=users[0].t
-    if g.p2:
+    if g.playerX and g.playerO:
         if g.playerX.id==c.from_user.id:
             g.call[1]=c
             if g.queue:
@@ -358,38 +353,35 @@ def xo(c):
                 bot.answer_callback_query(c.id,text=t['stop'])
         else:
             bot.answer_callback_query(c.id,text=t['stop+game'])
-    else:
-        try:
-            if g.playerO and c.from_user.id!=g.playerO.id:
-                g.playerX=c.from_user
-                g.p2=True
-                bot.answer_callback_query(c.id,text=t['start-pl-2'])
-            elif g.playerX and c.from_user.id!=g.playerX.id:
-                g.playerO=c.from_user
-                g.p2=True
-                bot.answer_callback_query(c.id,text=t['start-pl-2'])
-            else:
-                bot.answer_callback_query(c.id,text=t['wait'])
-            if g.p2:
-                buttons=M()
-                if 9>g.s>2:
-                    for i in range(g.s):
-                        buttons.row(*[B('⬜️',callback_data=f'{i*g.s+j:02}') for j in range(g.s)])
-                    bot.edit_message_text(inline_message_id=c.inline_message_id,text=f'❌ {g.playerX.first_name} 👈\n⭕️ {g.playerO.first_name}',reply_markup=buttons)
-                else:
-                    bot.answer_callback_query(c.id,text=t['oh'])
-                    bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['size'])
+        return 1
+    try:
+        if g.playerO and c.from_user.id!=g.playerO.id:
+            g.playerX=c.from_user
+            bot.answer_callback_query(c.id,text=t['start-pl-2'])
+            game(g,c,g.playerX,t)
+        elif g.playerX and c.from_user.id!=g.playerX.id:
+            g.playerO=c.from_user
+            buttons=M()
+            for i in range(g.s):
+                buttons.row(*[B('⬜️',callback_data=f'{i*g.s+j:02}') for j in range(g.s)])
+            bot.edit_message_text(inline_message_id=c.inline_message_id,text=f'❌ {g.playerX.first_name} 👈\n⭕️ {g.playerO.first_name}',reply_markup=buttons)
+            bot.answer_callback_query(c.id,text=t['start-pl-2'])
+        else:
+            bot.answer_callback_query(c.id,text=t['wait'])
         except:
-            bot.answer_callback_query(c.id,text=t['oh'])
-            bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
-for game in games:
-    if mktime(datetime.now().timetuple())-game.time>=600:
-        bot.edit_message_text(inline_message_id=game.id,text='⌛️')
-        del games[games.index(game)]
-for game_text in text_games:
-    if mktime(datetime.now().timetuple())-game_text.time>=600:
-        bot.edit_message_text(game_text.chat.id,game_text.message_id,'⌛️')
-        del text_games[text_games.index(game_text)]
+        bot.answer_callback_query(c.id,text=t['oh'])
+        bot.edit_message_text(inline_message_id=c.inline_message_id,text=t['again'])
+@bot.message_handler(content_types=['text'])
+def text_messages():
+    global games,text_games
+    for game in games:
+        if mktime(datetime.now().timetuple())-game.time>=600:
+            bot.edit_message_text(inline_message_id=game.id,text='⌛️')
+            del games[games.index(game)]
+    for game_text in text_games:
+        if mktime(datetime.now().timetuple())-game_text.time>=600:
+            bot.edit_message_text(game_text.chat.id,game_text.message_id,'⌛️')
+            del text_games[text_games.index(game_text)]
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,certificate=open(WEBHOOK_SSL_CERT, 'r'))
 cherrypy.config.update({
@@ -397,6 +389,5 @@ cherrypy.config.update({
     'server.socket_port': WEBHOOK_PORT,
     'server.ssl_module': 'builtin',
     'server.ssl_certificate': WEBHOOK_SSL_CERT,
-    'server.ssl_private_key': WEBHOOK_SSL_PRIV
-})
+    'server.ssl_private_key': WEBHOOK_SSL_PRIV})
 cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
