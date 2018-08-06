@@ -181,7 +181,7 @@ def xotext(m):
         tx=users[0].t
     for game in games:
         if m.chat.id==game.id:
-            bot.edit_message_text(m.chat.id,game.out.message_id,'♻️')
+            bot.edit_message_text('♻️',m.chat.id,game.out.message_id)
     t=m.text
     if t.startswith('/start') or t.startswith('/new') or t.startswith('/game'):
         bot.send_message(m.chat.id,tx['start']+'\n             /x                        /o')
@@ -214,7 +214,7 @@ def xogame(c):
             g=game
     try: assert g
     except:
-        bot.edit_message_text(m.from_user.id,m.message_id,'♻️')
+        bot.edit_message_text('♻️',m.from_user.id,m.message_id)
         return bot.answer_callback_query(c.id,text=t['don’t touch'])
     sign,my_sign=['❌','⭕️'] if g.isX else ['⭕️','❌']
     try:
@@ -379,7 +379,7 @@ def text_messages(m):
             del games[games.index(game)]
     for game_text in text_games:
         if mktime(datetime.now().timetuple())-game_text.time>=600:
-            bot.edit_message_text(game_text.chat.id,game_text.message_id,'⌛️')
+            bot.edit_message_text('⌛️',game_text.chat.id,game_text.message_id)
             del text_games[text_games.index(game_text)]
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,certificate=open(WEBHOOK_SSL_CERT, 'r'))
