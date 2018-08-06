@@ -214,7 +214,7 @@ def xogame(c):
             g=game
     try: assert g
     except:
-        bot.edit_message_text('♻️',m.from_user.id,m.message_id)
+        bot.edit_message_text('♻️',m.chat.id,m.message_id)
         return bot.answer_callback_query(c.id,text=t['don’t touch'])
     sign,my_sign=['❌','⭕️'] if g.isX else ['⭕️','❌']
     try:
@@ -276,14 +276,14 @@ def inline(q):
     button3=M()
     button3.add(*[B('⬜️',callback_data=f'{i:02}') for i in range(9)])
     if not q.query:
-        bot.answer_inline_query(q.id,[P('13'+q.id,'t.me/keklulkeklul/677','t.me/keklulkeklul/677',reply_markup=button3,input_message_content=C(f'❌ {name} 👈\n⭕️ ?')),P('23'+q.id,'t.me/keklulkeklul/679','t.me/keklulkeklul/679',reply_markup=button3,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))])
+        bot.answer_inline_query(q.id,[P('13'+q.id,'t.me/lviv_lamptest/677','t.me/lviv_lamptest/677',reply_markup=button3,input_message_content=C(f'❌ {name} 👈\n⭕️ ?')),P('23'+q.id,'t.me/lviv_lamptest/679','t.me/lviv_lamptest/679',reply_markup=button3,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))])
         return 1
     for s in range(3,9):
         button=M()
         for i in range(s):
             button.row(*[B('⬜️',callback_data=f'{i*s+j:02}') for j in range(s)])
-        xs=P('1'+str(s)+q.id,f't.me/keklulkeklul/{2025+s}','t.me/keklulkeklul/677',reply_markup=button,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))
-        os=P('2'+str(s)+q.id,f't.me/keklulkeklul/{2031+s}','t.me/keklulkeklul/679',reply_markup=button,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))
+        xs=P('1'+str(s)+q.id,f't.me/lviv_lamptest/{2025+s}','t.me/lviv_lamptest/677',reply_markup=button,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))
+        os=P('2'+str(s)+q.id,f't.me/lviv_lamptest/{2031+s}','t.me/lviv_lamptest/679',reply_markup=button,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))
         if str(s) in t:
             if 'x' in t.lower():
                 g.playerX=q.from_user
@@ -297,10 +297,10 @@ def inline(q):
         return bot.answer_inline_query(q.id,results)
     if not 'o' in t.lower():
         g.playerX=q.from_user
-        results+=[G('10'+q.id,'t.me/keklulkeklul/2066','t.me/keklulkeklul/2066',reply_markup=button3,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))]
+        results+=[G('10'+q.id,'t.me/lviv_lamptest/2066','t.me/lviv_lamptest/2066',reply_markup=button3,input_message_content=C(f'❌ {name} 👈\n⭕️ ?'))]
     if not 'x' in t.lower():
         g.playerO=q.from_user
-        results+=[G('20'+q.id,'t.me/keklulkeklul/2067','t.me/keklulkeklul/2067',reply_markup=button3,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))]
+        results+=[G('20'+q.id,'t.me/lviv_lamptest/2067','t.me/lviv_lamptest/2067',reply_markup=button3,input_message_content=C(f'❌ ? 👈\n⭕️ {name}'))]
     bot.answer_inline_query(q.id,results)
 @bot.chosen_inline_handler(func=lambda cr: True)
 def chosen(cr):
