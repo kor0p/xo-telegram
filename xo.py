@@ -128,10 +128,9 @@ class User:
         self.t=languages[language]
         self.out=out
 class Game_text:
-    def __init__(self,out,time,id,isX=False,board=[]):
+    def __init__(self,out,time,isX=False,board=[]):
         self.out=out
         self.time=time
-        self.id=id
         self.isX=isX
         self.b=board
 class Game:
@@ -180,7 +179,7 @@ def xotext(m):
     except:
         tx=users[0].t
     for game in games:
-        if m.chat.id==game.id:
+        if m.chat.id==game.out.chat.id:
             bot.edit_message_text('♻️',m.chat.id,game.out.message_id)
     t=m.text
     if t.startswith('/start') or t.startswith('/new') or t.startswith('/game'):
@@ -192,11 +191,11 @@ def xotext(m):
         if 'x' in t:
             buttons.add(*[B('⬜️',callback_data=f'-{i}') for i in range(9)])
             out=bot.send_message(m.chat.id,f"❌ {name} 👈\n⭕️ {tx['bot']}",reply_markup=buttons)
-            text_games.append(Game_text(id=m.chat.id,out=out,time=now,isX=True,board=['⬜️']*9))
+            text_games.append(Game_text(out=out,time=now,isX=True,board=['⬜️']*9))
         elif 'o' in t:
             buttons.add(*[B('⬜️',callback_data=f'-{i}') if i!=4 else B('❌',callback_data='-❌') for i in range(9)])
             out=bot.send_message(m.chat.id,f"❌ {tx['bot']} 👈\n⭕️ {name}",reply_markup=buttons)
-            text_games.append(Game_text(id=m.chat.id,out=out,time=now,isX=False,board=['⬜️' if i!=4 else '❌' for i in range(9)]))
+            text_games.append(Game_text(out=out,time=now,isX=False,board=['⬜️' if i!=4 else '❌' for i in range(9)]))
 @bot.callback_query_handler(lambda c: search(r'-(\d|x|o)',c.data))
 def xogame(c):
     global text_games
@@ -210,7 +209,7 @@ def xogame(c):
         t=users[0].t
     player = c.from_user.first_name if c.from_user.first_name else 'None'
     for game in text_games:
-        if m.chat.id==game.id:
+        if m.chat.id==game.out.chat.id:
             g=game
     try: assert g
     except:
@@ -379,7 +378,7 @@ def text_messages(m):
             del games[games.index(game)]
     for game_text in text_games:
         if mktime(datetime.now().timetuple())-game_text.time>=600:
-            bot.edit_message_text('⌛️',game_text.chat.id,game_text.message_id)
+            bot.edit_message_text('⌛️',game_text.out.chat.id,game_text.out.message_id)
             del text_games[text_games.index(game_text)]
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,certificate=open(WEBHOOK_SSL_CERT, 'r'))
