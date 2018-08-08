@@ -14,20 +14,6 @@ WEBHOOK_SSL_PRIV = '../webhook/webhook_pkey.pem'
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_URL_PATH = "/%s/" % token
 games=[]; text_games=[]
-class WebhookServer(object):
-    Timeout()
-    @cherrypy.expose
-    def index(self):
-        if 'content-length' in cherrypy.request.headers and \
-                        'content-type' in cherrypy.request.headers and \
-                        cherrypy.request.headers['content-type'] == 'application/json':
-            length = int(cherrypy.request.headers['content-length'])
-            json_string = cherrypy.request.body.read(length).decode("utf-8")
-            update = telebot.types.Update.de_json(json_string)
-            bot.process_new_updates([update])
-            return ''
-        else:
-            raise cherrypy.HTTPError(403)
 languages={
     'en':{
         'start':'Choose your side and get started!','bot':'Bot','don’t touch':'Oh, don’t touch this)','cnl':'Canceled',
@@ -156,6 +142,20 @@ class Game:
     def __init__(self,id):
         self.id=id
 users=[User(id=0)]
+class WebhookServer(object):
+    Timeout()
+    @cherrypy.expose
+    def index(self):
+        if 'content-length' in cherrypy.request.headers and \
+                        'content-type' in cherrypy.request.headers and \
+                        cherrypy.request.headers['content-type'] == 'application/json':
+            length = int(cherrypy.request.headers['content-length'])
+            json_string = cherrypy.request.body.read(length).decode("utf-8")
+            update = telebot.types.Update.de_json(json_string)
+            bot.process_new_updates([update])
+            return ''
+        else:
+            raise cherrypy.HTTPError(403)
 @bot.message_handler(commands=['settings'])
 def setting(m):
     global users
