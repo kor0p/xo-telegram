@@ -14,20 +14,6 @@ WEBHOOK_SSL_PRIV = '../webhook/webhook_pkey.pem'
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_URL_PATH = "/%s/" % token
 games=[]; text_games=[]
-class WebhookServer(object):
-    Timeout()
-    @cherrypy.expose
-    def index(self):
-        if 'content-length' in cherrypy.request.headers and \
-                        'content-type' in cherrypy.request.headers and \
-                        cherrypy.request.headers['content-type'] == 'application/json':
-            length = int(cherrypy.request.headers['content-length'])
-            json_string = cherrypy.request.body.read(length).decode("utf-8")
-            update = telebot.types.Update.de_json(json_string)
-            bot.process_new_updates([update])
-            return ''
-        else:
-            raise cherrypy.HTTPError(403)
 languages={
     'en':{
         'start':'Choose your side and get started!','bot':'Bot','don’t touch':'Oh, don’t touch this)','cnl':'Canceled',
@@ -87,8 +73,8 @@ def game_xo(g,c,pl1,t):
         sign_0,sign_1 = ['🏆','☠️'] if g.queue else ['☠️','🏆']
         buttons.add(B('❌',switch_inline_query_current_chat='x'+str(g.s)),B(text='⭕️',switch_inline_query_current_chat='o'+str(g.s)))
         bot.edit_message_text(inline_message_id=c.inline_message_id,text=g.b_text+f'\n❌ {name0} '+sign_0+f'\n⭕️ {name1} '+sign_1,reply_markup=buttons)
-        bot.answer_callback_query(g.call[g.queue].id,text=t['win'])
-        bot.answer_callback_query(g.call[not g.queue].id,text=t['lose'])
+        bot.answer_callback_query(g.call[g.queue].id,text=t['win'],show_alert=True)
+        bot.answer_callback_query(g.call[not g.queue].id,text=t['lose'],show_alert=True)
         del games[games.index(g)]
     elif not '⬜️' in g.b:
         g.b_text=''
@@ -98,8 +84,8 @@ def game_xo(g,c,pl1,t):
             g.b_text+='\n'
         buttons.add(B('❌',switch_inline_query_current_chat='x'+str(g.s)),B(text='⭕️',switch_inline_query_current_chat='o'+str(g.s)))
         bot.edit_message_text(inline_message_id=c.inline_message_id,text=g.b_text+f'\n❌ {name0} 🤛🤜 {name1} ⭕️',reply_markup=buttons)
-        bot.answer_callback_query(g.call[0].id,text=t['tie'])
-        bot.answer_callback_query(g.call[1].id,text=t['tie'])
+        bot.answer_callback_query(g.call[0].id,text=t['tie'],show_alert=True)
+        bot.answer_callback_query(g.call[1].id,text=t['tie'],show_alert=True)
         del games[games.index(g)]
     else:
         g.queue=not g.queue
@@ -156,26 +142,36 @@ class Game:
     def __init__(self,id):
         self.id=id
 users=[User(id=0)]
+class WebhookServer(object):
+    Timeout()
+    @cherrypy.expose
+    def index(self):
+        if 'content-length' in cherrypy.request.headers and \
+                        'content-type' in cherrypy.request.headers and \
+                        cherrypy.request.headers['content-type'] == 'application/json':
+            length = int(cherrypy.request.headers['content-length'])
+            json_string = cherrypy.request.body.read(length).decode("utf-8")
+            update = telebot.types.Update.de_json(json_string)
+            bot.process_new_updates([update])
+            return ''
+        else:
+            raise cherrypy.HTTPError(403)
 @bot.message_handler(commands=['settings'])
 def setting(m):
     global users
-    t=m.text
-    buttons=M()
-    buttons.add(B('Eng',callback_data='en'),B('Ukr',callback_data='ua'),B('Rus',callback_data='ru'),B('Cancel',callback_data='cnl'))
-    out=bot.send_message(m.chat.id,
-    'Choose language to play\nОбери мову, якою гратимеш\nВыбери язык, которым будеш играть',
-    reply_markup=buttons)
+    buttons=M(B('Eng',callback_data='en'),B('Ukr',callback_data='ua'),B('Rus',callback_data='ru'),B('Cancel',callback_data='cnl'))
+    out=bot.send_message(m.chat.id,'Choose language to play\nОбери мову, якою гратимеш\nВыбери язык, которым будеш играть',reply_markup=buttons)
     for user in users:
         if m.from_user.id==user.id:
             del users[users.index(user)]
-    users.append(User(id=m.from_user.id,out=out))
+    u=User(id=m.from_user.id); u.out=out; users+=[u]
 @bot.callback_query_handler(lambda c: search('en|ua|ru|cnl',c.data))
 def settings(c):
     global users
     for u in users:
         if c.from_user.id==u.id:
             if c.data=='cnl':
-                return bot.edit_message_text('Canceled\nВідмінено\nОтменено',c.mesage.chat.id,u.out.message_id)
+                return bot.edit_message_text('Canceled\nВідмінено\nОтменено',c.message.chat.id,u.out.message_id)
             if not languages[c.data]==u.t:
                 u.t=languages[c.data]
             bot.edit_message_text('✔️Done\n✔️Готово\n✔️Сделано',c.message.chat.id,u.out.message_id)
@@ -196,20 +192,22 @@ def xotext(m):
     try: assert tx
     except: tx=users[0].t
     for game in text_games:
-        if m.chat.id==game.out.chat.id: bot.edit_message_text('♻️',m.chat.id,game.out.message_id)
+        if m.chat.id==game.out.chat.id:
+            bot.edit_message_text('♻️',m.chat.id,game.out.message_id)
+            del text_games[text_games.index(game)]
     name=m.from_user.first_name if m.from_user.first_name else 'None'
     now=mktime(datetime.now().timetuple())
     if 'x' in t:
         buttons.add(*[B('⬜️',callback_data=f'-{i}') for i in range(9)])
         out=bot.send_message(m.chat.id,f"❌ {name} 👈\n⭕️ {tx['bot']}",reply_markup=buttons)
-        game=Game_text(out=out,time=now); game.isX=True; game.b=['⬜️']*9
-        text_games.append(game)
+        g=Game_text(out=out,time=now); g.isX=True; g.b=['⬜️']*9
+        text_games+=[g]
     elif 'o' in t:
         buttons.add(*[B('⬜️',callback_data=f'-{i}') if i!=4 else B('❌',callback_data='-❌') for i in range(9)])
         out=bot.send_message(m.chat.id,f"❌ {tx['bot']} 👈\n⭕️ {name}",reply_markup=buttons)
-        game=Game_text(out=out,time=now); game.isX=False; game.b=['⬜️' if i!=4 else '❌' for i in range(9)]
-        text_games.append(game)
-@bot.callback_query_handler(lambda c: search(r'-(\d|x|o)',c.data))
+        g=Game_text(out=out,time=now); g.isX=False; g.b=['⬜️' if i!=4 else '❌' for i in range(9)]
+        text_games+=[g]
+@bot.callback_query_handler(lambda c: search(r'-(\d|❌|⭕️)',c.data))
 def xogame(c):
     global text_games
     m=c.message
@@ -229,12 +227,13 @@ def xogame(c):
         bot.edit_message_text('♻️',m.chat.id,m.message_id)
         return bot.answer_callback_query(c.id,text=t['don’t touch'])
     sign,my_sign=['❌','⭕️'] if g.isX else ['⭕️','❌']
-    if search('\d',c.data[1]):
-        choice=int(c.data[1])
-        if f(g.b[choice]):
-            g.b[choice]=sign
-        else:
-            bot.answer_callback_query(c.id,t['don’t touch'])
+    if c.data=='-❌' or c.data=='-⭕️':
+        return bot.answer_callback_query(c.id,text=t['don’t touch'])
+    choice=int(c.data[1])
+    if f(g.b[choice]):
+        g.b[choice]=sign
+    else:
+        return bot.answer_callback_query(c.id,t['don’t touch'])
     my_choice=my_choice_func(g.b,my_sign,sign)
     if f(g.b[4]): my_choice=4
     if my_choice>-1:
@@ -282,8 +281,8 @@ def inline(q):
     t=q.query; results=[]
     cnl=M(); cnl.add(B('Cancel',callback_data='cancelinline'))
     for s in range(3,9):
-        xs=P('1'+str(s)+q.id,f't.me/lviv_lamptest/{2025+s}','t.me/lviv_lamptest/677',reply_markup=cnl,input_message_content=C('❌ ? 👈\n⭕️ ?'))
-        os=P('2'+str(s)+q.id,f't.me/lviv_lamptest/{2031+s}','t.me/lviv_lamptest/679',reply_markup=cnl,input_message_content=C('❌ ? 👈\n⭕️ ?'))
+        xs=G('1'+str(s)+q.id,f't.me/lviv_lamptest/{2025+s}','t.me/lviv_lamptest/677',reply_markup=cnl,input_message_content=C('❌ ? 👈\n⭕️ ?'))
+        os=G('2'+str(s)+q.id,f't.me/lviv_lamptest/{2031+s}','t.me/lviv_lamptest/679',reply_markup=cnl,input_message_content=C('❌ ? 👈\n⭕️ ?'))
         if str(s) in t:
             if not 'o' in t.lower(): results+=[xs]
             if not 'x' in t.lower(): results+=[os]
@@ -334,7 +333,10 @@ def xo(c):
     try: assert t
     except:
         t=users[0].t
+    if c.data=='❌' or c.data=='⭕️':
+        return bot.answer_callback_query(c.id,text=t['don’t touch'])
     if c.data=='cancelinline':
+        del games[games.index(g)]
         return bot.edit_message_text(inline_message_id=g.id,text=t['cnl'])
     start=False
     if g.playerX:
@@ -364,7 +366,7 @@ def xo(c):
                 game_xo(g,c,g.playerO,t)
             else:
                 return bot.answer_callback_query(c.id,text=t['stop'])
-    elif g.playerO!=c.from_user.id:
+    elif g.playerO.id!=c.from_user.id:
         if g.queue:
             g.playerX=c.from_user
             bot.answer_callback_query(c.id,text=t['start-pl-2'])
@@ -375,6 +377,8 @@ def xo(c):
             game_xo(g,c,g.playerX,t)
         else:
             return bot.answer_callback_query(c.id,text=t['stop'])
+    else:
+        return bot.answer_callback_query(c.id,text=t['don’t touch'])
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,certificate=open(WEBHOOK_SSL_CERT, 'r'))
 cherrypy.config.update({
@@ -384,3 +388,4 @@ cherrypy.config.update({
     'server.ssl_certificate': WEBHOOK_SSL_CERT,
     'server.ssl_private_key': WEBHOOK_SSL_PRIV})
 cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
+
