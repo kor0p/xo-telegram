@@ -34,29 +34,50 @@ callback_text = r'-(\d|{}|{})'.format(Xsgn,Osgn)
 callback = r'\d\d|{}|{}|cancel|tie|giveup|confirm'.format(Xsgn,Osgn)
 languages = {
       'en':{
-        'start':'Choose your side and get started!','bot':'Bot','don’t touch':'Oh, don’t touch this)','cnld':'Canceled','win':'Oh, victory!',
-        'lose':'You loooose… Try harder!','tie':'It is really tie?','new':'Start a new game?','stop':'Stop! Wait your turn','oh':'Oh shit!',
-        'stop+game':'Stop! There already playing','again':'Oh, try again…','start-pl-2':'Let’s go!','confirmloss':'Confirm giving up!',
-        'confirmtie':'Accept tie?','player':'Player','gu_done':'gives up','dotie':'Tie','giveup':'Give up','cnl':'Cancel',
-        'startN':'Choose size and get started!'
+        'start':'Choose your side and get started!','bot':'Bot',
+        'don’t touch':'Oh, don’t touch this)','cnld':'Canceled',
+        'win':'Oh, victory!','lose':'You loooose… Try harder!',
+        'tie':'It is really tie?','new':'Start a new game?',
+        'stop':'Stop! Wait your turn','oh':'Oh shit!',
+        'stop+game':'Stop! There already playing','dotie':'Tie',
+        'again':'Oh, try again…','confirmtie':'Accept tie?',
+        'confirmloss':'Confirm giving up!','start-pl-2':'Let’s go!',
+        'player':'Player','gu_done':'gives up','giveup':'Give up',
+        'cnl':'Cancel','startN':'Choose size and get started!'
     },'ua':{
-        'start':'Обирай сторону і почнімо!','bot':'Бот','don’t touch':'Ой, да не тикай сюди!','cnld':'Відмінено','win':'О, ти переміг!',
-        'lose':'О, ні, ти програв…','tie':'Невже нічия?','new':'Зіграємо ще раз?','stop':'Стоп! Не твій хід!','oh':'Бляха…',
-        'stop+game':'Стоп! Тут уже грають!','again':'Спробуй ще раз…','start-pl-2':'Почнімо!','confirmloss':'Підтвердьте програш!',
-        'confirmtie':'Приймаєш нічию?','player':'Гравець','gu_done':'здався/здалась','dotie':'Нічия','giveup':'Здатися','cnl':'Відміна',
-        'startN':'Обирай розмір і почнімо!'
+        'start':'Обирай сторону і почнімо!','bot':'Бот',
+        'don’t touch':'Ой, да не тикай сюди!','cnld':'Відмінено',
+        'win':'Вау, перемога!','lose':'О, ні, знову програш…',
+        'tie':'Невже нічия?','new':'Зіграємо ще раз?',
+        'stop':'Стоп! Не твій хід!','oh':'Бляха…',
+        'stop+game':'Стоп! Тут уже грають!','dotie':'Нічия',
+        'again':'Спробуй ще раз…','confirmtie':'Приймаєш нічию?',
+        'confirmloss':'Підтвердь програш!','start-pl-2':'Почнімо!',
+        'player':'Гравець','gu_done':'здався','giveup':'Здатися',
+        'cnl':'Відміна','startN':'Обирай розмір і почнімо!'
     },'ru':{
-        'start':'Выбери сторону и начнём!','bot':'Бот','don’t touch':'Ой, да не тыкай сюда!','cnld':'Отменено','win':'О, ты победил!',
-        'lose':'О, нет, ти проиграл…','tie':'Неужели ничья?','new':'Сыграем ещё раз?','stop':'Стопэ! Не твой ход!','oh':'Ляя…',
-        'stop+game':'Стопэ! Здесь уже играют!','again':'Попробуйте ещё раз…','start-pl-2':'Начнём!','confirmloss':'Подтвердите проиграш!',
-        'confirmtie':'Принимаешь ничью?','player':'Игрок','gu_done':'сдался/сдалась','dotie':'Ничья','giveup':'Сдаться','cnl':'Отмена',
-        'startN':'Выбери размер и начнём!'
+        'start':'Выбери сторону и начнём!','bot':'Бот',
+        'don’t touch':'Ой, да не тыкай сюда!','cnld':'Отменено',
+        'win':'Вау победа!','lose':'О, нет, опять проиграш…',
+        'tie':'Неужели ничья?','new':'Сыграем ещё раз?',
+        'stop':'Стопэ! Не твой ход!','oh':'Ляя…',
+        'stop+game':'Стопэ! Здесь уже играют!','dotie':'Ничья',
+        'again':'Попробуй ещё раз…','confirmtie':'Принимаешь ничью?',
+        'confirmloss':'Подтвердите проиграш!','start-pl-2':'Начнём!',
+        'player':'Игрок','gu_done':'сдался','giveup':'Сдаться',
+        'cnl':'Отмена','startN':'Выбери размер и начнём!'
     },'sr':{
-        'start':'Изаберите страну и почните!','bot':'Бот','don’t touch':'Ох, да не идите овде!','cnld':'Промењено','win':'О, ти победио!',
-        'lose':'О, не, изгубио си…','tie': 'Стварно жреб?','new':' Се поново играти??','stop':'Стани! Не твој потез!',' oh':'Бре…',
-        'stop+game':'Стоп! Овде је већ играју!','again': 'Пробајте поново…','start-pl-2':'Почнемо!','confirmloss':'Потврди губитника!',
-        'confirmtie':'Да ли прихватате жребање?','player':'Играч','gu_done':'одустаје','dotie':'жреб','giveup':'одустати','cnl':'Отказ',
-        'startN':'Изаберите величине и почните!'
+        'start':'Изаберите страну и почните!','bot':'Бот',
+        'don’t touch':'Ох, да не идите овде!','cnld':'Промењено',
+        'win':'О, ти победио!','lose':'О, не, изгубио си…',
+        'tie': 'Стварно жреб?','new':' Се поново играти??',
+        'stop':'Стани! Не твој потез!',' oh':'Бре…',
+        'stop+game':'Стоп! Овде је већ играју!',
+        'again': 'Пробајте поново…','start-pl-2':'Почнемо!',
+        'confirmtie':'Да ли прихватате жребање?',
+        'confirmloss':'Потврди губитника!','dotie':'жреб',
+        'player':'Играч','gu_done':'одустаје','giveup':'одустати',
+        'cnl':'Отказ','startN':'Изаберите величине и почните!'
     }}
 free = lambda a: a!=Xsgn and a!=Osgn
 last_of_three = lambda b,x,y,z,s:\
@@ -254,19 +275,20 @@ class WebhookServer(object):
             raise cherrypy.HTTPError(403)
 @bot.message_handler(commands=['settings'])
 def settingscommand(m):
-    button = M([
-    [B('Eng',callback_data='enS'),
-     B('Ukr',callback_data='uaS'),
-     B('Rus',callback_data='ruS'),
-     B('Srp',callback_data='srS') ],
-    [B('Cancel',callback_data='cnl')]
-    ])
+    button = M(row_width=4)
+    button.add(
+        B('Eng',callback_data='enS'),
+        B('Ukr',callback_data='uaS'),
+        B('Rus',callback_data='ruS'),
+        B('Srp',callback_data='srS'),
+        B('Cancel',callback_data='cnl')
+    )
     out = bot.send_message(m.chat.id,'''
         Choose language to play
         Обери мову, якою гратимеш
         Выбери язык, которым будеш играть
         Изаберите језик да игра
-        ''',reply_markup=button)
+        '''.replace('    ',''),reply_markup=button)
     for user in users:
         if m.from_user.id==user.id:
             users.remove(user)
@@ -276,16 +298,18 @@ def settings(c):
     for u in users:
         if c.from_user.id==u.id:
             if c.data=='cnl':
-                return bot.edit_message_text('''
-                Canceled           Відмінено
-                Отменено           Отказ
-                ''',c.message.chat.id,u.out.message_id)
+                return bot.edit_message_text(
+                'Canceled              Відмінено\n'+\
+                'Отменено           Отказ',
+                c.message.chat.id,
+                u.out.message_id)
             elif not languages[c.data[:2]]==u.t:
                 u.t = languages[c.data[:2]]
-            bot.edit_message_text('''
-            ✔️Done         ✔️Готово
-            ✔️Сделано      ✔️Готово
-            ''',c.message.chat.id,u.out.message_id)
+            bot.edit_message_text(
+            '✔️Done            ✔️Готово\n'+\
+            '✔️Сделано      ✔️Готово',
+            c.message.chat.id,
+            u.out.message_id)
 @bot.message_handler(commands=['x','o','start','new','game'])
 def xotext(m):
     tx = False; t = m.text; button = M()
@@ -421,9 +445,17 @@ def xogame(c):
                 m.chat.id,
                 g.out.message_id)
             if s==sign:
-                return bot.answer_callback_query(c.id,text=t['win'])
+                return bot.answer_callback_query(
+                    c.id,
+                    text=t['win'],
+                    show_alert=True
+                    )
             elif s==my_sign:
-                return bot.answer_callback_query(c.id,text=t['lose'])
+                return bot.answer_callback_query(
+                c.id,
+                text=t['lose'],
+                show_alert=True
+                )
             text_games.remove(g)
             break
     if not cell in b :
@@ -438,7 +470,11 @@ def xogame(c):
             m.chat.id,
             g.out.message_id
             )
-        bot.answer_callback_query(c.id,text=t['tie'])
+        bot.answer_callback_query(
+            c.id,
+            text=t['tie'],
+            show_alert=True
+            )
         text_games.remove(g)
     else:
         button.add(*[
