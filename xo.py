@@ -27,11 +27,19 @@ Osgn = '⭕️'
 winsgn = '🏆'
 losesgn = '☠️'
 cell='⬜️'
+<<<<<<< HEAD
 tiesgn = '🤜🤛'
 turnsgn = ' 👈'
 settingscall = '[en|ua|ru|sr]S|cnl'
 callback_text = '-[\d|{}|{}]'.format(Xsgn,Osgn)
 callback = '=[\d\d|{}|{}]|cancel|tie|giveup|confirm'.format(Xsgn,Osgn)
+=======
+tiesgn = '🤛🤜'
+turnsgn = ' 👈'
+settingscall = '[en|ua|ru|sr]S|cnl'
+callback_text = r'-(\d|{}|{})'.format(Xsgn,Osgn)
+callback = r'\d\d|{}|{}|cancel|tie|giveup|confirm'.format(Xsgn,Osgn)
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
 languages = {
       'en':{
         'start':'Choose your side and get started!','bot':'Bot',
@@ -138,11 +146,18 @@ def winxo(b,s,sz):
     return False
 def end(g,text,w,l,cid):
     b_text = board_text(g.b,g.s)
+<<<<<<< HEAD
     button=M()
     button.add(
         B(Xsgn,switch_inline_query_current_chat='x'+str(g.s)),
         B(Osgn,switch_inline_query_current_chat='o'+str(g.s))
         )
+=======
+    button=M([[
+        B(Xsgn,switch_inline_query_current_chat='x'+str(g.s)),
+        B(Osgn,switch_inline_query_current_chat='o'+str(g.s))
+        ]])
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
     bot.edit_message_text(
         inline_message_id=cid,
         text=b_text+text,
@@ -159,11 +174,19 @@ def end(g,text,w,l,cid):
         text=l,
         show_alert=True
         )
+<<<<<<< HEAD
 def game_xo(g,choice,t,cid):
     name_X = g.playerX.first_name if g.playerX else '?'
     name_O = g.playerO.first_name if g.playerO else '?'
     g.b[int(choice[1:])] = [Osgn,Xsgn][g.queue]
     win=winxo(g.b,g.b[int(choice[1:])],g.s)
+=======
+def game_xo(g,choice,pl1,t,cid):
+    name_X = g.playerX.first_name if g.playerX else '?'
+    name_O = g.playerO.first_name if g.playerO else '?'
+    g.b[int(choice)] = [Osgn,Xsgn][g.queue]
+    win=winxo(g.b,g.b[int(choice)],g.s)
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
     if win:
         if g.queue:
             sign_X,sign_O = [winsgn,losesgn]
@@ -178,7 +201,11 @@ def game_xo(g,choice,t,cid):
             cid)
     elif not cell in g.b:
         return end(g,f'''
+<<<<<<< HEAD
                 {Xsgn} {name_X} {tiesgn} {name_O} {Osgn}
+=======
+                {Xsgn} {name_X} {tiesgn} {name_O}{Osgn}
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
             '''.replace('    ',''),
             t['tie'],
             t['tie'],
@@ -187,7 +214,11 @@ def game_xo(g,choice,t,cid):
     button = M(row_width=g.s)
     button.add(*[
         B(  g.b[i],
+<<<<<<< HEAD
             callback_data=f'={i:02}' if g.b[i]==cell else g.b[i])
+=======
+            callback_data=f'{i:02}' if g.b[i]==cell else g.b[i])
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
         for i in range(g.s**2)
         ])
     button.add(
@@ -212,10 +243,18 @@ def my_choice_func(b,msgn,sgn):
         for x,y,z in [[0,4,8],[2,4,6]]:
             res = last_of_three(b,x,y,z,s)
             if res>-1: return res
+<<<<<<< HEAD
     for i,j,k,l,r in [
         (1,3,1,5,2),(3,7,5,7,8),(2,6,0,8,1),(2,3,0,5,1),
         (3,8,5,6,7),(1,6,0,7,3),(1,8,2,7,5),(4,8,4,8,2)]:
             if (b[i]==b[j]==sgn or b[k]==b[l]==sgn) and free(b[r]):
+=======
+    for i,j,r in [
+        (1,3,0),(1,5,2),(3,7,6),(5,7,8),(2,6,1),(0,8,1),
+        (2,3,1),(0,5,1),(3,8,7),(5,6,7),
+        (1,6,3),(0,7,3),(1,8,5),(2,7,5)]:
+            if b[i]==b[j]==sgn and free(b[r]):
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
                 return r
     for i in range(9):
         if free(b[i]):
@@ -330,7 +369,11 @@ def xotext(m):
                 m.chat.id,
                 game.out.message_id
                 )
+<<<<<<< HEAD
             text_games.pop(game)
+=======
+            text_games.remove(game)
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
     name = m.from_user.first_name
     now = mktime(datetime.now().timetuple())
     if 'x' in t:
@@ -398,13 +441,27 @@ def xogame(c):
             text=t['don’t touch']
             )
     sign,my_sign = [Xsgn,Osgn] if g.isX else [Osgn,Xsgn]
+<<<<<<< HEAD
     if not free(c.data[1:]):
+=======
+    if c.data=='-❌' or c.data=='-⭕️':
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
         return bot.answer_callback_query(
             c.id,
             text=t['don’t touch']
             )
     choice = int(c.data[1])
+<<<<<<< HEAD
     g.b[choice] = sign
+=======
+    if free(g.b[choice]):
+        g.b[choice] = sign
+    else:
+        return bot.answer_callback_query(
+            c.id,
+            t['don’t touch']
+            )
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
     my_choice = my_choice_func(g.b,my_sign,sign)
     if free(g.b[4]): my_choice = 4
     if my_choice >- 1:
@@ -438,7 +495,10 @@ def xogame(c):
                     '      /x            /o',
                 m.chat.id,
                 g.out.message_id)
+<<<<<<< HEAD
             text_games.remove(g)
+=======
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
             if s==sign:
                 return bot.answer_callback_query(
                     c.id,
@@ -451,6 +511,11 @@ def xogame(c):
                 text=t['lose'],
                 show_alert=True
                 )
+<<<<<<< HEAD
+=======
+            text_games.remove(g)
+            break
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
     if not cell in b :
         b_text = ''
         for i in range(3):
@@ -559,7 +624,11 @@ def chosen(cr):
     button=M(row_width=g.s)
     button.add(*[
         B(  g.b[i],
+<<<<<<< HEAD
             callback_data=f'={i:02}'
+=======
+            callback_data=f'{i:02}'
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
         ) for i in range(g.s**2)
         ])
     bot.edit_message_text(
@@ -583,16 +652,23 @@ def choicesize(c):
     g.s=int(c.data[-1])
     g.b=[cell for i in range(g.s**2)]
     g.time=mktime(datetime.now().timetuple())
+<<<<<<< HEAD
     if not g.playerX and g.playerO.id!=c.from_user.id:
         g.playerX=c.from_user
     elif not g.playerO and g.playerX.id!=c.from_user.id:
         g.playerO=c.from_user
+=======
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
     name_X = g.playerX.first_name if g.playerX else '?'
     name_O = g.playerO.first_name if g.playerO else '?'
     button=M(row_width=g.s)
     button.add(*[
         B(  g.b[i],
+<<<<<<< HEAD
             callback_data=f'={i:02}'
+=======
+            callback_data=f'{i:02}'
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
         ) for i in range(g.s**2)
         ])
     bot.edit_message_text(
@@ -603,7 +679,12 @@ def choicesize(c):
         '''.replace('    ',''),
         reply_markup=button
         )
+<<<<<<< HEAD
 @bot.callback_query_handler(lambda c: search(callback,c.data))
+=======
+@bot.callback_query_handler(lambda c:\
+    search(callback,c.data) and c.data[0]!='-')
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
 def xo(c):
     usid = c.from_user.id; t=g=False
     for game in games:
@@ -626,7 +707,11 @@ def xo(c):
         button = M(row_width=g.s)
         button.add(*[
             B(  g.b[i],
+<<<<<<< HEAD
                 callback_data=f'={i:02}' if g.b[i]==cell else g.b[i])
+=======
+                callback_data=f'{i:02}' if g.b[i]==cell else g.b[i])
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
             for i in range(g.s**2)
             ])
         return bot.edit_message_text(
@@ -664,7 +749,11 @@ def xo(c):
     elif g.tie_id:
         if g.tie_id != usid and g.playerX and g.playerO:
             return end(g,f'''
+<<<<<<< HEAD
                 {Xsgn} {name_X} {tiesgn} {name_O} {Osgn}
+=======
+                {Xsgn} {name_X} {tiesgn} {name_O}{Osgn}
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
                 {t['cnld']}
             '''.replace('    ',''),
             t['tie'],
@@ -696,7 +785,11 @@ def xo(c):
             )
     elif g.giveup_user:
         if g.giveup_user.id==usid and g.playerO and g.playerX:
+<<<<<<< HEAD
             if g.playerO.id==usid:
+=======
+            if g.playerX==usid:
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
                 sign_X,sign_O = winsgn,losesgn
                 resX,resO = t['win'],t['lose']
             else:
@@ -704,7 +797,11 @@ def xo(c):
                 resX,resO = t['lose'],t['win']
             return end(g,f'''
             {Xsgn} {name_X} {sign_X}
+<<<<<<< HEAD
             {Osgn} {name_O} {sign_O}
+=======
+            {Osgn} {name_O} {sign_0}
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
             {t['player']} {g.giveup_user.first_name} {t['gu_done']}
                 '''.replace('    ',''),
                 resX,
@@ -716,7 +813,11 @@ def xo(c):
             t['don’t touch'],
             show_alert=True
             )
+<<<<<<< HEAD
     elif not free(c.data):
+=======
+    elif c.data==Xsgn or c.data==Osgn:
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
         Timeout()
         if g.lastcall:
             bot.answer_callback_query(
@@ -734,7 +835,11 @@ def xo(c):
             g.call[1] = g.newcall = c
             if g.queue:
                 return game_xo(
+<<<<<<< HEAD
                     g,c.data,t,c.inline_message_id
+=======
+                    g,c.data,g.playerX,t,c.inline_message_id
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
                     )
             return bot.answer_callback_query(c.id,text=t['stop'])
         elif not g.playerO:
@@ -744,7 +849,11 @@ def xo(c):
             g.call[0] = g.newcall = c
             if not g.queue:
                 return game_xo(
+<<<<<<< HEAD
                     g,c.data,t,c.inline_message_id
+=======
+                    g,c.data,g.playerO,t,c.inline_message_id
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
                     )
             return bot.answer_callback_query(c.id,text=t['stop'])
         return bot.answer_callback_query(c.id,text=t['stop+game'])
@@ -754,7 +863,11 @@ def xo(c):
             g.playerX = c.from_user
             bot.answer_callback_query(c.id,text=t['start-pl-2'])
             return game_xo(
+<<<<<<< HEAD
                 g,c.data,t,c.inline_message_id
+=======
+                g,c.data,g.playerX,t,c.inline_message_id
+>>>>>>> 39dc9cf6adeceecc56360ceb814768d1fc200d45
                 )
         return bot.answer_callback_query(c.id,text=t['stop'])
     return bot.answer_callback_query(c.id,text=t['don’t touch'])
