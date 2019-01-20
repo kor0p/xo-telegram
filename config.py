@@ -3,7 +3,8 @@ import cherrypy
 import threading
 import sqlite3
 import re
-from time import sleep
+from os import system
+from collections import namedtuple
 from secure_config import (
     token, ip_address, port, path_to_db
 )
@@ -14,6 +15,7 @@ bot = telebot.TeleBot(token)
 
 WEBHOOK_HOST = ip_address
 WEBHOOK_PORT = port
+# 443,80,88 or 8443,port must be open; I use 8443
 WEBHOOK_LISTEN = '0.0.0.0'
 # on some servers need to be as WEBHOOK_HOST
 WEBHOOK_SSL_CERT = '../webhook/webhook_cert.pem'
@@ -21,66 +23,72 @@ WEBHOOK_SSL_PRIV = '../webhook/webhook_pkey.pem'
 WEBHOOK_URL_BASE = 'https://%s:%s' % (WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_URL_PATH = '/%s/' % token
 
-languages = {
+langs = {
     'en': {
         'start': 'Choose your side and get started!',
         'bot': 'Bot',
-        'don’t touch': 'Oh, don’t touch this)',
+        'dont_touch': 'Oh, don\'t touch this)',
         'cnld': 'Canceled',
         'new': 'Start a new game?',
         'to_win': lambda s: f'{s} in the row to win!',
         'stop': 'Stop! Wait your turn',
-        'stop+game': 'Stop! There already playing',
+        'stop_game': 'Stop! There already playing',
         'dotie': 'Tie',
-        'confirmtie': 'Accept tie?',
-        'confirmloss': 'Confirm giving up!',
-        'start-pl-2': 'Let’s go!',
+        'confirm_tie': 'Accept tie?',
+        'confirm_giveup': 'Confirm giving up!',
+        'start_pl_2': 'Let’s go!',
         'player': lambda n: f'Player {n} gives up',
         'giveup': 'Give up',
         'cnf': 'Confirm',
         'cnl': 'Cancel',
         'startN': 'Choose size and get started!',
-        'random': 'Random'
+        'random': 'Random',
+        'timeout': lambda s: f'Seconds remains: {s}'
     }, 'uk': {
         'start': 'Обирай сторону і почнімо!',
         'bot': 'Бот',
-        'don’t touch': 'Ой, сюди не тикай)',
+        'dont_touch': 'Ой, сюди не тикай)',
         'cnld': 'Відмінено',
         'new': 'Зіграємо ще раз?',
         'to_win': lambda s: f'{s} поспіль для перемоги!',
         'stop': 'Стоп! Не твій хід)',
-        'stop+game': 'Стоп! Тут уже грають)',
+        'stop_game': 'Стоп! Тут уже грають)',
         'dotie': 'Нічия',
-        'confirmtie': 'Приймаєш нічию?',
-        'confirmloss': 'Підтвердь поразку!',
-        'start-pl-2': 'Почнімо!',
+        'confirm_tie': 'Приймаєш нічию?',
+        'confirm_giveup': 'Підтвердь поразку!',
+        'start_pl_2': 'Почнімо!',
         'player': lambda n: f'Гравець {n} здався',
         'giveup': 'Здатися',
         'cnf': 'Підтверджую',
         'cnl': 'Відміна',
         'startN': 'Обирай тип і до бою!',
-        'random': 'Однаково'
+        'random': 'Однаково',
+        'timeout': lambda s: f'Секунд лишилось: {s}'
     }, 'ru': {
         'start': 'Выбери сторону и начнём!',
         'bot': 'Бот',
-        'don’t touch': 'Ой, да не тыкай сюда!',
+        'dont_touch': 'Ой, да не тыкай сюда!',
         'cnld': 'Отменено',
         'new': 'Сыграем ещё раз?',
         'to_win': lambda s: f'{s} в ряд для победы!',
         'stop': 'Стопэ! Не твой ход!',
-        'stop+game': 'Стопэ! Здесь уже играют!',
+        'stop_game': 'Стопэ! Здесь уже играют!',
         'dotie': 'Ничья',
-        'confirmtie': 'Принимаешь ничью?',
-        'confirmloss': 'Подтвердите проиграш!',
-        'start-pl-2': 'Начнём!',
+        'confirm_tie': 'Принимаешь ничью?',
+        'confirm_giveup': 'Подтвердите проиграш!',
+        'start_pl_2': 'Начнём!',
         'player': lambda n: f'Игрок {n} сдался',
         'giveup': 'Сдаться',
         'cnf': 'Подтверждаю',
         'cnl': 'Отмена',
         'startN': 'Выбери тип и к бою!',
-        'random': 'Рандом'
+        'random': 'Рандом',
+        'timeout': lambda s: f'Секунд осталось: {s}'
     }
 }
+
+lang = namedtuple('lang', langs['en'])
+languages = {k: lang(*langs[k].values()) for k in langs}
 
 # constants
 how_many_to_win = {
@@ -90,6 +98,8 @@ how_many_to_win = {
 }
 
 cell = '⬜'
+time_sgn = '⏳'
+new_time_sgn = '⌛️'
 
 x_sgn = '❌'
 o_sgn = '⭕'
@@ -178,7 +188,7 @@ class tg_user:
     __str__ = __repr__
 
     def __bool__(self):
-        return self.__repr__() != str(tg_user_default)
+        return str(self) != str(tg_user_default)
 
     def lang(self):
         l_code = self.language_code
@@ -195,6 +205,199 @@ class tg_user:
         return self.id != other.id
 
 
+class Row:
+
+    def __init__(self, board):
+        if type(board) == str:
+            board = list(board)
+        self.value = board
+
+    def __setitem__(self, key, item):
+        self.value[key] = item
+
+    def __getitem__(self, key):
+        return self.value[key]
+
+    def __repr__(self):
+        return ''.join(self.value)
+
+    __str__ = __repr__
+
+
+class Board:
+
+    def __init__(self, _board=''):
+        self.value = _board
+        self.size = s = int(len(self.value)**(.5))
+        if self.size == 9:
+            return Board_9(_board)
+        assert 9 > self.size > 2 or not self.size
+        self.value = [
+            Row(self.value[i*s:(i+1)*s])
+            for i in range(s)
+        ]
+
+    def __getitem__(self, key):
+        s = self.size
+        if type(key) == tuple:
+            return self.value[key[0]][key[1]]
+        if type(key) == slice:
+            start, stop = key.start, key.stop
+            if not start:
+                start = 0
+            if not stop:
+                stop = s-1
+            return self.value[start*s:(stop+1)*s]
+        if key >= s:
+            raise IndexError('board index out of range')
+        return Row(self.value[key])
+
+    def __setitem__(self, key, item):
+        if key and type(key) == tuple:
+            self.value[key[0]][key[1]] = item
+
+    def __bool__(self):
+        return (cell in str(self.value))
+
+    def __repr__(self):
+        return ''.join(list(map(str, self)))
+
+    __str__ = __repr__
+
+    def last_of_three(self, a, b, c, sign):
+        for x, y, z in [[a, b, c], [c, a, b], [b, c, a]]:
+            if self[x] == self[y] == sign and free(self[z]):
+                return z
+        return ()
+
+    def board_text(self, last_turn):
+        b = ''
+        for i in range(self.size):
+            for j in range(self.size):
+                b += new_game_signs[self[i][j]]\
+                    if last_turn == (i, j) else self[i][j]
+            b += '\n'
+        return b
+
+    def winxo(self, sgn):
+        row = how_many_to_win[self.size]
+        # one system for all sizes
+        rowr = range(row)
+        return any([
+            all([self[j+q][i+q] == sgn for q in rowr]) or
+            # main diagonal check
+            all([self[j+q][i+row-1-q] == sgn for q in rowr]) or
+            # collateral diagonal check
+            any([
+                all([self[j+l][i+q] == sgn for q in rowr]) or
+                # horizontal lines check
+                all([self[j+q][i+l] == sgn for q in rowr])
+                # vertical lines check
+                for l in range(row)
+            ])
+            for i in range(self.size + 1 - row)
+            for j in range(self.size + 1 - row)
+        ])
+
+    def bot_choice_func(self, bot_sgn, user_sgn):
+        if not self:
+            return []
+        for s in [bot_sgn, user_sgn]:
+            for x, y, z in (
+                ((0, 0), (1, 1), (2, 2)),  # . 0 1 2
+                ((0, 2), (1, 1), (2, 0)),  # 0 . . .
+                ((0, 0), (1, 0), (2, 0)),  # 1 . . .
+                ((0, 0), (0, 1), (0, 2)),  # 2 . . .
+                ((0, 1), (1, 1), (2, 1)),
+                ((1, 0), (1, 1), (1, 2)),
+                ((0, 2), (1, 2), (2, 2)),
+                ((2, 0), (2, 1), (2, 2))
+            ):
+                res = self.last_of_three(x, y, z, s)
+                if res:
+                    return res
+        # leave this part, please, it just works!
+        for i, j, k, r in (
+            ((0, 1), (1, 0), (1, 2), (0, 2)),
+            ((2, 1), (1, 0), (1, 2), (2, 2)),
+            ((0, 2), (2, 0), (1, 0), (0, 1)),
+            ((0, 0), (2, 2), (1, 2), (0, 1))
+        ):
+            if (free(self[r]) and
+                self[i] == user_sgn and
+                user_sgn in (self[j], self[k])
+                ):
+                return r
+        for i, j, k, l, r in (
+            ((1, 0), (2, 2), (1, 2), (2, 0), (2, 1)),
+            ((0, 1), (2, 0), (0, 0), (2, 1), (1, 0)),
+            ((0, 1), (2, 2), (0, 2), (2, 1), (1, 2)),
+            ((1, 1), (2, 2), (1, 1), (2, 2), (0, 2))
+        ):
+            if free(self[r]) and (
+                self[i] == self[j] == user_sgn or
+                self[k] == self[l] == user_sgn
+            ):
+                return r
+        # lasr hope :)
+        for i in range(3):
+            for j in range(3):
+                if free(self[i][j]):
+                    return i, j
+
+    def game_Buttons(self, game_sign, last_turn,
+                     user_language=tg_user(tg_user_default).lang()):
+        return InlineButtons(
+            tuple(
+                (new_game_signs[self[i][j]]
+                 if last_turn == (i, j) else
+                 self[i][j],
+                 game_sign +
+                 str((self[i][j], f'{i}{j}')[self[i][j] == cell])
+                 )
+                for i in range(self.size)
+                for j in range(self.size)
+            )
+            +
+            (
+                (user_language.dotie, 'tie'),
+                (user_language.giveup, 'giveup')
+            ) * bool(user_language),
+            width=self.size
+        )
+
+    def end_game_Buttons(self, current_chat=False):
+        return _InlineButtons_(
+            [[
+                {
+                    'text': x_sgn,
+                    'current_chat': f'x{self.size}'
+                    if current_chat else None,
+                    'another_chat': f'x{self.size}'
+                    if not current_chat else None
+                },
+                {
+                    'text': o_sgn,
+                    'current_chat': f'o{self.size}'
+                    if current_chat else None,
+                    'another_chat': f'o{self.size}'
+                    if not current_chat else None
+                }
+            ] + [[
+                {
+                    'text': repeat_sgn,
+                    'callback': repeat_sgn * 2
+                },
+                {
+                    'text': robot_sgn,
+                    'url': 't.me/m0xbot?start=1'
+                }
+            ][current_chat]
+            ]],
+            width=2
+        )
+
+
 class xo_text:
 
     def __init__(self, id, new=False):
@@ -207,7 +410,7 @@ class xo_text:
                 FROM xo_text
                 WHERE id = ?
             ''', [self.id])
-        if list(Cur):
+        if tuple(Cur):
             if not new:
                 return self.pull()
             self.dlt()
@@ -228,7 +431,7 @@ class xo_text:
             WHERE id = ?
             ''', [
             str(self.isX),
-            self.b,
+            str(self.b),
             self.id
         ])
         Conn.commit()
@@ -241,9 +444,9 @@ class xo_text:
                 WHERE id = ?
                 ''', [self.id]
         )
-        isX, b = list(Cur)[0][1:]
+        isX, b = tuple(Cur)[0][1:]
         self.isX = int(isX)
-        self.b = b
+        self.b = Board(b)
 
     def dlt(self):
         Cur.execute('''
@@ -263,34 +466,30 @@ class xo:
                 SELECT *
                 FROM xo
                 WHERE id = ?
-            ''', [self.id])
-        if list(Cur):
+            ''', (self.id,)
+        )
+        if tuple(Cur):
             if not new:
                 return self.pull()
             self.dlt()
             return None
-        self.plX = self.plO = self.giveup_user\
-            = tg_user(tg_user_default)
-        self.queue = 1
-        self.b = ''
-        self.s = 3
-        self.tie_id = 0
+        self._set()
         Cur.execute('''
             INSERT INTO xo
             VALUES (?,?,?,?,?,?,?,?)
             ''', (
             self.id, str(self.plX), str(self.plO),
             str(self.giveup_user), self.queue,
-            self.b, self.s, self.tie_id
+            str(self.b), self.s, self.tie_id
         )
         )
         Conn.commit()
 
     def push(self):
-        list_to_set = ', '.join([
+        list_to_set = ', '.join((
             f'{name} = "{value}"'
             for name, value in self.__dict__.items()
-        ])
+        ))
         Cur.execute(f'''
             UPDATE xo
             SET   {list_to_set}
@@ -304,18 +503,13 @@ class xo:
                 SELECT *
                 FROM xo
                 WHERE id = ?
-            ''', [self.id]
+            ''', (self.id,)
         )
-        id,\
-            plX, plO, giveup_user,\
-            queue, b, s, tie_id = list(Cur)[0]
-        self.plX = tg_user(plX)
-        self.plO = tg_user(plO)
-        self.giveup_user = tg_user(giveup_user)
-        self.b = b
-        self.queue = int(queue)
-        self.s = int(s)
-        self.tie_id = int(tie_id)
+        cr = tuple(Cur)
+        if not cr:
+            self._set()
+            return None
+        self._set(*cr[0])
 
     def upd_id(self, new_id):
         Cur.execute('''
@@ -325,6 +519,7 @@ class xo:
             ''', [new_id, self.id])
         Conn.commit()
         self.id = new_id
+        self.Timeout(self.s*180, '_')
 
     def dlt(self):
         Cur.execute('''
@@ -334,139 +529,138 @@ class xo:
             ''', [self.id])
         Conn.commit()
 
+    def _set(self, *args,
+             plX=tg_user_default, plO=tg_user_default,
+             giveup_user=tg_user_default, queue=1,
+             b='', s=3, tie_id=0
+             ):
+        if args:
+            id, plX, plO, giveup_user, queue, b, s, tie_id = args
+        self.plX = tg_user(plX)
+        self.plO = tg_user(plO)
+        self.giveup_user = tg_user(giveup_user)
+        self.queue = int(queue)
+        self.b = Board(b)
+        self.s = int(s)
+        self.tie_id = int(tie_id)
+
+    def __bool__(self):
+        Cur.execute(
+            '''
+            SELECT *
+            FROM xo
+            WHERE id = ?
+            ''', (self.id,)
+        )
+        return bool(tuple(Cur))
+
     def __repr__(self):
         return str(self.__dict__)
 
-    def __str__(self):
-        # same as __repr__
-        return str(self.__dict__)
+    __str__ = __repr__
 
+    def game_language(self):
+        ul1 = self.plX.lang()
+        ul2 = self.plO.lang()
+        if ul1 == ul2:
+            return ul1
+        return lang(*(
+            (k1 + '\n' + k2
+                if type(k1) == str else
+                (merge_user_languages(k1, k2))
+             )
+            for k1, k2 in zip(ul1, ul2)
+        ))
 
-def free(a): return a not in game_signs
-
-
-def merge_user_languages(ul1, ul2):
-    return lambda n: ul1(n) + '\n' + ul2(n)
-
-
-def last_of_three(b, x, y, z, s): return \
-    z if b[x] == b[y] == s and free(b[z]) else\
-    y if b[x] == b[z] == s and free(b[y]) else\
-    x if b[y] == b[z] == s and free(b[x]) else -1
-
-
-def board_text(board, size, last_turn):
-    b = ''
-    for i in range(size):
-        for j in range(size):
-            key = i * size + j
-            b += new_game_signs[board[key]]\
-                if last_turn == key else board[key]
-        b += '\n'
-    return b
-
-
-def winxo(board, sgn, size):
-    assert 9 > size > 2
-    row = how_many_to_win[size]
-    # one system for all sizes
-    # easy to manage
-    for i in range(size + 1 - row):
-        for j in range(size + 1 - row):
-            if all([board[i+q+(j+q)*size] == sgn
-                    for q in range(row)]) or\
-                    all([board[i+row-1-q+(j+q)*size] == sgn
-                         for q in range(row)]):
-                return True
-            for l in range(row):
-                if all([board[i+q+(j+l)*size] == sgn
-                        for q in range(row)]) or\
-                        all([board[i+l+(j+q)*size] == sgn
-                             for q in range(row)]):
-                    return True
-    return False
-
-
-def end(g, text, index_last_turn):
-    b_text = board_text(g.b, g.s, index_last_turn)
-    b_text_new = board_text(g.b, g.s, -1)
-    button = end_game_Buttons(g.s)
-    bot.edit_message_text(
-        inline_message_id=g.id,
-        text=b_text + text,
-        reply_markup=button
-    )
-    if index_last_turn:
-        sleep(5)
+    def end(self, g_type, index_last_turn, text=''):
+        name_X = self.plX.first_name
+        name_O = self.plO.first_name
+        ul = self.game_language()
+        text += '\n'
+        if g_type == 'tie':
+            text +=\
+                f'{x_sgn} {name_X} {tie_sgn} {name_O} {o_sgn}\n' +\
+                ul.cnld*bool(self.b)
+        elif g_type == 'win' or g_type == 'giveup':
+            text += \
+                f'{x_sgn} {name_X} {end_signs[self.queue]}\n' +\
+                f'{o_sgn} {name_O} {end_signs[not self.queue]}\n'
+        elif g_type:
+            text +=\
+                f'{x_sgn} {name_X}\n' +\
+                f'{o_sgn} {name_O}\n'
+        if g_type == 'giveup':
+            text += ul.player(self.giveup_user.first_name)
+        b_text = self.b.board_text(index_last_turn)
+        button = self.b.end_game_Buttons(current_chat=True)
         bot.edit_message_text(
-            inline_message_id=g.id,
-            text=b_text_new + text,
+            b_text + text,
+            inline_message_id=self.id,
             reply_markup=button
         )
-    g.dlt()
+        if index_last_turn:
+            self.Timeout(
+                5,
+                '\n'+self.b.board_text(None)+text
+            )
+        self.dlt()
 
-
-def game_xo(g, choice, ul):
-    turn = choice
-    name_X = g.plX.first_name
-    name_O = g.plO.first_name
-    g.b = g.b[:turn] + game_signs[g.queue] + g.b[turn + 1:]
-    win = winxo(g.b, g.b[choice], g.s)
-    if win:
-        return end(
-            g,
-            f'{x_sgn} {name_X} {end_signs[g.queue]}\n' +
-            f'{o_sgn} {name_O} {end_signs[not g.queue]}',
-            choice
+    def game_xo(self, choice):
+        ul = self.game_language()
+        name_X = self.plX.first_name
+        name_O = self.plO.first_name
+        if choice:
+            self.b[choice] = game_signs[self.queue]
+            if self.b.winxo(self.b[choice]):
+                return self.end('win', choice)
+            elif not self.b:
+                return self.end('tie', choice)
+        if x_sgn in str(self.b) or o_sgn in str(self.b):
+            self.queue = int(not self.queue)  # pass turn
+        self.push()
+        return bot.edit_message_text(
+            ul.to_win(how_many_to_win[self.s]) + '\n' +
+            f'{x_sgn} {name_X}{turn_sgn*self.queue}\n' +
+            f'{o_sgn} {name_O}{turn_sgn*(not self.queue)}',
+            inline_message_id=self.id,
+            reply_markup=self.b.game_Buttons(
+                friend_sgn, choice, user_language=ul
+            )
         )
-    elif cell not in g.b:
-        return end(
-            g,
-            f'{x_sgn} {name_X} {tie_sgn} {name_O} {o_sgn}',
-            choice
+
+    def Timeout(self, temp_time, g_type):
+        system(
+            'python3 timeout_.py -i {} -t {} -x "{}" &'.format(
+                self.id, temp_time, g_type
+            )
         )
-    g.queue = int(not g.queue)  # pass turn
-    g.push()
-    return bot.edit_message_text(
-        inline_message_id=g.id,
-        text=ul['to_win'](how_many_to_win[g.s]) + '\n' +
-        f'{x_sgn} {name_X}{turn_sgn*g.queue}\n' +
-        f'{o_sgn} {name_O}{turn_sgn*(not g.queue)}',
-        reply_markup=game_Buttons(
-            g.b,
-            g.s,
-            friend_sgn,
-            choice,
-            user_language=ul
+
+    def Timeout_confirm(self, g_type, pl):
+        ul = self.game_language()
+        another_user = (self.plX, self.plO)[pl == self.plX]
+        _user = another_user if g_type == 'tie' else pl
+        ul_user = _user.lang()
+        text = eval(f"ul_user.confirm_{g_type}")
+        buttons = InlineButtons((
+            (ul_user.cnf, 'confirm_'+g_type),
+            (ul.cnl, 'cancelend')
+        ))
+        bot.edit_message_text(
+            f'[{_user.first_name}](tg://user?id={_user.id}),\n{text}',
+            inline_message_id=self.id,
+            reply_markup=buttons,
+            parse_mode='Markdown'
         )
-    )
+        self.Timeout(30, g_type)
+        return 1
 
 
-def bot_choice_func(board, bot_sgn, user_sgn):
-    if not (cell in board):
-        return -1
-    for s in [bot_sgn, user_sgn]:
-        for i in range(3):
-            for x, y, z in [[3*i, 3*i+1, 3*i+2], [i, i+3, i+6]]:
-                res = last_of_three(board, x, y, z, s)
-                if res > -1:
-                    return res
-        for x, y, z in [[0, 4, 8], [2, 4, 6]]:
-            res = last_of_three(board, x, y, z, s)
-            if res > -1:
-                return res
-    for i, j, k, l, r in [
-            (1, 3, 1, 5, 2), (3, 7, 5, 7, 8),
-            (2, 6, 0, 8, 1), (2, 3, 0, 5, 1),
-            (3, 8, 5, 6, 7), (1, 6, 0, 7, 3),
-            (1, 8, 2, 7, 5), (4, 8, 4, 8, 2)]:
-        # leave this part, please, it just works!
-        if (board[i] == board[j] == user_sgn or
-                board[k] == board[l] == user_sgn) and free(board[r]):
-            return r
-    for i in range(9):
-        if free(board[i]):
-            return i
+def free(board_cell):
+    return board_cell not in game_signs
+
+
+def merge_user_languages(k1, k2):
+    return lambda n: k1(n) + '\n' + k2(n)
 
 
 def InlineButtons(Buttons, width=3):
@@ -501,57 +695,6 @@ def _InlineButtons_(Buttons, width=3):
             pay=button.get('pay')
         ) for i in Buttons for button in i])
     return temp_buttons
-
-
-def game_Buttons(board, size, game_sign, last_turn, user_language={}):
-    return InlineButtons(
-        [
-            (new_game_signs[board[i]]
-                if int(last_turn) == i else
-             board[i],
-                game_sign +
-                str([board[i], f'{i:02}'][board[i] == cell])
-             )
-            for i in range(size**2)
-        ]
-        +
-        [
-            (user_language.get('dotie'), 'tie'),
-            (user_language.get('giveup'), 'giveup')
-        ] * bool(user_language),
-        width=size
-    )
-
-
-def end_game_Buttons(size, current_chat=True):
-    return _InlineButtons_(
-        [[
-            {
-                'text': x_sgn,
-                'current_chat': f'x{size}'
-                if current_chat else None,
-                'another_chat': f'x{size}'
-                if not current_chat else None
-            },
-            {
-                'text': o_sgn,
-                'current_chat': f'o{size}'
-                if current_chat else None,
-                'another_chat': f'o{size}'
-                if not current_chat else None
-            }
-        ] +
-            [{
-                'text': robot_sgn,
-                'url': 't.me/m0xbot?start=1'
-            }] * current_chat +
-            [{
-                'text': repeat_sgn,
-                'callback': repeat_sgn * 2
-            }] * (not current_chat)
-        ],
-        width=2
-    )
 
 
 lock = threading.Lock()
