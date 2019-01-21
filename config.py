@@ -4,6 +4,7 @@ import threading
 import sqlite3
 import re
 from os import system
+from random import choice
 from collections import namedtuple
 from secure_config import (
     token, ip_address, port, path_to_db
@@ -27,7 +28,7 @@ langs = {
     'en': {
         'start': 'Choose your side and get started!',
         'bot': 'Bot',
-        'dont_touch': 'Oh, don\'t touch this)',
+        'dont_touch': 'Oh, you can\'t go there',
         'cnld': 'Canceled',
         'new': 'Start a new game?',
         'to_win': lambda s: f'{s} in the row to win!',
@@ -47,7 +48,7 @@ langs = {
     }, 'uk': {
         'start': 'Обирай сторону і почнімо!',
         'bot': 'Бот',
-        'dont_touch': 'Ой, сюди не тикай)',
+        'dont_touch': 'Ой, сюди заборонено ходити)',
         'cnld': 'Відмінено',
         'new': 'Зіграємо ще раз?',
         'to_win': lambda s: f'{s} поспіль для перемоги!',
@@ -67,7 +68,7 @@ langs = {
     }, 'ru': {
         'start': 'Выбери сторону и начнём!',
         'bot': 'Бот',
-        'dont_touch': 'Ой, да не тыкай сюда!',
+        'dont_touch': 'Ой, ты не можеш сюда идти!',
         'cnld': 'Отменено',
         'new': 'Сыграем ещё раз?',
         'to_win': lambda s: f'{s} в ряд для победы!',
@@ -97,38 +98,35 @@ how_many_to_win = {
     7: 5, 8: 5
 }
 
-cell = '⬜'
-time_sgn = '⏳'
-new_time_sgn = '⌛️'
+signs = namedtuple('signs', ('cell', 'x', 'o'))
+sgn = signs('⬜', '❌', '⭕')
+new_sgn = signs('🔲', '✖', '🔴')
+cnst = namedtuple('const_signs', (
+    'lock', 'time', 'win', 'lose', 'tie', 'turn', 'repeat', 'robot', 'friend'
+))('🔒', '⏳', '🏆', '☠️', '🤜🤛', ' 👈', '🔄', '🤖', '🙎')
 
-x_sgn = '❌'
-o_sgn = '⭕'
-game_signs = [o_sgn, x_sgn]
+game_signs = (sgn.o, sgn.x)
+end_signs = (cnst.lose, cnst.win)
+new_game_signs = {
+    sgn.x: new_sgn.x,
+    sgn.o: new_sgn.o,
+    sgn.cell: new_sgn.cell,
+    new_sgn.x: sgn.x,
+    new_sgn.o: sgn.o,
+    new_sgn.cell: sgn.cell
+}
 
-new_x_sgn = '✖'
-new_o_sgn = '🔴'
-new_game_signs = {x_sgn: new_x_sgn, o_sgn: new_o_sgn, cell: cell}
-
-win_sgn = '🏆'
-lose_sgn = '☠️'
-end_signs = [lose_sgn, win_sgn]
-
-tie_sgn = '🤜🤛'
-turn_sgn = ' 👈'
-repeat_sgn = '🔄'
-robot_sgn = '🤖'
-friend_sgn = '🙎'
 tg_user_default = {'id': 0, 'first_name': '?', 'language_code': 'en'}
 
 
 def search_callback(to_find):
     return lambda c: re.search(
         {
-            'reset_start': repeat_sgn * 2,
-            'start': repeat_sgn + f'[{x_sgn}|{o_sgn}]',
+            'reset_start': cnst.repeat * 2,
+            'start': cnst.repeat + f'[{sgn.x}|{sgn.o}]',
             'choice_size': 'start\d',
-            'text': robot_sgn + f'[\d\d|{x_sgn}|{o_sgn}]',
-            'friend': friend_sgn + f'[\d\d|{x_sgn}|{o_sgn}]',
+            'text': cnst.repeat + f'[\d\d|{sgn.x}|{sgn.o}]',
+            'friend': cnst.friend + f'[\d\d|{sgn.x}|{sgn.o}|{cnst.lock}]',
             'confirm/end': 'cancel|tie|giveup|confirm'
         }[to_find],
         c.data)
@@ -216,10 +214,15 @@ class Row:
         self.value[key] = item
 
     def __getitem__(self, key):
+        if type(key) == tuple:
+            return self.value[key[0]][key[1]]
         return self.value[key]
 
     def __repr__(self):
-        return ''.join(self.value)
+        return join('', self)
+
+    def __len__(self):
+        return 3
 
     __str__ = __repr__
 
@@ -227,29 +230,16 @@ class Row:
 class Board:
 
     def __init__(self, _board=''):
-        self.value = _board
-        self.size = s = int(len(self.value)**(.5))
-        if self.size == 9:
-            return Board_9(_board)
+        self.size = s = int(len(_board)**(.5))
         assert 9 > self.size > 2 or not self.size
         self.value = [
-            Row(self.value[i*s:(i+1)*s])
+            Row(_board[i*s:(i+1)*s])
             for i in range(s)
         ]
 
     def __getitem__(self, key):
-        s = self.size
         if type(key) == tuple:
             return self.value[key[0]][key[1]]
-        if type(key) == slice:
-            start, stop = key.start, key.stop
-            if not start:
-                start = 0
-            if not stop:
-                stop = s-1
-            return self.value[start*s:(stop+1)*s]
-        if key >= s:
-            raise IndexError('board index out of range')
         return Row(self.value[key])
 
     def __setitem__(self, key, item):
@@ -257,12 +247,15 @@ class Board:
             self.value[key[0]][key[1]] = item
 
     def __bool__(self):
-        return (cell in str(self.value))
+        return (sgn.cell in str(self.value))
 
     def __repr__(self):
-        return ''.join(list(map(str, self)))
+        return join('', self)
 
     __str__ = __repr__
+
+    def __len__(self):
+        return self.size
 
     def last_of_three(self, a, b, c, sign):
         for x, y, z in [[a, b, c], [c, a, b], [b, c, a]]:
@@ -270,13 +263,12 @@ class Board:
                 return z
         return ()
 
-    def board_text(self, last_turn):
-        b = ''
-        for i in range(self.size):
-            for j in range(self.size):
-                b += new_game_signs[self[i][j]]\
-                    if last_turn == (i, j) else self[i][j]
-            b += '\n'
+    def board_text(self, last_turn=None):
+        if last_turn:
+            self[last_turn] = new_game_signs[self[last_turn]]
+        b = join('\n', [self[i] for i in range(self.size)])
+        if last_turn:
+            self[last_turn] = new_game_signs[self[last_turn]]
         return b
 
     def winxo(self, sgn):
@@ -324,9 +316,9 @@ class Board:
             ((0, 0), (2, 2), (1, 2), (0, 1))
         ):
             if (free(self[r]) and
-                self[i] == user_sgn and
-                user_sgn in (self[j], self[k])
-                ):
+                    self[i] == user_sgn and
+                    user_sgn in (self[j], self[k])
+                    ):
                 return r
         for i, j, k, l, r in (
             ((1, 0), (2, 2), (1, 2), (2, 0), (2, 1)),
@@ -345,15 +337,15 @@ class Board:
                 if free(self[i][j]):
                     return i, j
 
-    def game_Buttons(self, game_sign, last_turn,
+    def game_Buttons(self, last_turn, game_sign,
                      user_language=tg_user(tg_user_default).lang()):
+        if last_turn:
+            self[last_turn] = new_game_signs[self[last_turn]]
         return InlineButtons(
             tuple(
-                (new_game_signs[self[i][j]]
-                 if last_turn == (i, j) else
-                 self[i][j],
+                (self[i][j],
                  game_sign +
-                 str((self[i][j], f'{i}{j}')[self[i][j] == cell])
+                 str((self[i][j], f'{i}{j}')[self[i][j] == sgn.cell])
                  )
                 for i in range(self.size)
                 for j in range(self.size)
@@ -370,14 +362,14 @@ class Board:
         return _InlineButtons_(
             [[
                 {
-                    'text': x_sgn,
+                    'text': sgn.x,
                     'current_chat': f'x{self.size}'
                     if current_chat else None,
                     'another_chat': f'x{self.size}'
                     if not current_chat else None
                 },
                 {
-                    'text': o_sgn,
+                    'text': sgn.o,
                     'current_chat': f'o{self.size}'
                     if current_chat else None,
                     'another_chat': f'o{self.size}'
@@ -385,16 +377,136 @@ class Board:
                 }
             ] + [[
                 {
-                    'text': repeat_sgn,
-                    'callback': repeat_sgn * 2
+                    'text': cnst.repeat,
+                    'callback': cnst.repeat * 2
                 },
                 {
-                    'text': robot_sgn,
+                    'text': cnst.repeat,
                     'url': 't.me/m0xbot?start=1'
                 }
             ][current_chat]
             ]],
             width=2
+        )
+
+
+class Board_9(Board):
+
+    def __init__(self, _board=''):
+        if not _board:
+            _board = sgn.cell*81
+        self.size = s = 9
+        self.value = [[
+            Board(_board[(i*3+j)*9:(i*3+j+1)*9])
+            for j in range(3)]
+            for i in range(3)
+        ]
+        self.s_value = Board(_board[81:])\
+            if len(_board) == 90 else Board('')
+
+    def __getitem__(self, key):
+        s = self.size
+        if type(key) == tuple:
+            if len(key) == 2:
+                return self.value[key[0]][key[1]]
+            return self.value[key[0]][key[1]][key[2]][key[3]]
+        return Row(self.value[key])
+
+    def __setitem__(self, key, item):
+        if key and type(key) == tuple:
+            if len(key) == 2:
+                self.value[key[0]][key[1]] = item
+                return None
+            self.value[key[0]][key[1]][key[2]][key[3]] = item
+
+    def __repr__(self):
+        return join('', self) + str(self.small_value())
+
+    __str__ = __repr__
+
+    def small_value(self, new=False):
+        arr = []
+        if self.s_value:
+            if not new:
+                return self.s_value
+            else:
+                arr = list(str(self.s_value))
+        if not arr:
+            arr = [sgn.cell]*9
+        for i in range(self.size):
+            for s in game_signs:
+                if self[i//3][i % 3].winxo(s) and\
+                        arr[i] == sgn.cell:
+                    arr[i] = s
+        return Board(join('', arr))
+
+    def board_text(self, last_turn=()):
+        if last_turn:
+            self[last_turn] = new_game_signs[self[last_turn]]
+            self[last_turn[2:]] = Board(''.join([
+                new_game_signs[i]
+                for row in self[last_turn[2:]]
+                for i in row
+            ]))
+        b = '\n\n'.join(
+            ['\n'.join(
+                [join('  ',
+                      [self[i][j][k] for j in range(3)]
+                      ) for k in range(3)
+                 ]
+            ) for i in range(3)]
+        ) + '\n'
+        if last_turn:
+            self[last_turn] = new_game_signs[self[last_turn]]
+            self[last_turn[2:]] = Board(''.join([
+                new_game_signs[i]
+                for row in self[last_turn[2:]]
+                for i in row
+            ]))
+        if last_turn:
+            last_turn = last_turn[:2]
+        b += '\n' + self.small_value().board_text(last_turn) + '\n'
+        return b
+
+    def winxo(self, sgn):
+        return self.small_value().winxo(sgn)
+
+    def game_Buttons(self,
+                     l_t=(),
+                     game_sign=cnst.friend,
+                     user_language=tg_user(tg_user_default).lang()
+                     ):
+        if l_t:
+            board = self[l_t[2:]]
+            if not board:
+                l_t = ()
+                board = self.small_value()
+            if l_t[0] != 9:
+                board[l_t[:2]] = cnst.lock
+            l_t = l_t[2:]
+        else:
+            board = self.small_value()
+        if not l_t:
+            l_t = (9, 9)
+        return InlineButtons(
+            tuple(
+                (board[i][j],
+                 game_sign +
+                 str(
+                    (board[i][j],
+                     f'{l_t[0]}{l_t[1]}{i}{j}'
+                     )[board[i][j] == sgn.cell]
+                )
+                )
+                for i in range(3)
+                for j in range(3)
+            )
+            +
+            (
+                (user_language.dotie, 'tie'),
+                (user_language.giveup, 'giveup')
+            ) * bool(user_language),
+            width=3
         )
 
 
@@ -519,7 +631,6 @@ class xo:
             ''', [new_id, self.id])
         Conn.commit()
         self.id = new_id
-        self.Timeout(self.s*180, '_')
 
     def dlt(self):
         Cur.execute('''
@@ -540,7 +651,7 @@ class xo:
         self.plO = tg_user(plO)
         self.giveup_user = tg_user(giveup_user)
         self.queue = int(queue)
-        self.b = Board(b)
+        self.b = Board_9(b) if int(s) == 9 else Board(b)
         self.s = int(s)
         self.tie_id = int(tie_id)
 
@@ -572,23 +683,23 @@ class xo:
             for k1, k2 in zip(ul1, ul2)
         ))
 
-    def end(self, g_type, index_last_turn, text=''):
+    def end(self, g_type, index_last_turn=None, text=''):
         name_X = self.plX.first_name
         name_O = self.plO.first_name
         ul = self.game_language()
         text += '\n'
         if g_type == 'tie':
             text +=\
-                f'{x_sgn} {name_X} {tie_sgn} {name_O} {o_sgn}\n' +\
+                f'{sgn.x} {name_X} {cnst.tie} {name_O} {sgn.o}\n' +\
                 ul.cnld*bool(self.b)
         elif g_type == 'win' or g_type == 'giveup':
             text += \
-                f'{x_sgn} {name_X} {end_signs[self.queue]}\n' +\
-                f'{o_sgn} {name_O} {end_signs[not self.queue]}\n'
+                f'{sgn.x} {name_X} {end_signs[self.queue]}\n' +\
+                f'{sgn.o} {name_O} {end_signs[not self.queue]}\n'
         elif g_type:
             text +=\
-                f'{x_sgn} {name_X}\n' +\
-                f'{o_sgn} {name_O}\n'
+                f'{sgn.x} {name_X}\n' +\
+                f'{sgn.o} {name_O}\n'
         if g_type == 'giveup':
             text += ul.player(self.giveup_user.first_name)
         b_text = self.b.board_text(index_last_turn)
@@ -601,11 +712,13 @@ class xo:
         if index_last_turn:
             self.Timeout(
                 5,
-                '\n'+self.b.board_text(None)+text
+                '\n'+self.b.board_text()+text
             )
         self.dlt()
 
     def game_xo(self, choice):
+        if self.s == 9:
+            return self.game_xo_9(choice)
         ul = self.game_language()
         name_X = self.plX.first_name
         name_O = self.plO.first_name
@@ -615,16 +728,44 @@ class xo:
                 return self.end('win', choice)
             elif not self.b:
                 return self.end('tie', choice)
-        if x_sgn in str(self.b) or o_sgn in str(self.b):
+        if sgn.x in str(self.b) or sgn.o in str(self.b):
             self.queue = int(not self.queue)  # pass turn
         self.push()
         return bot.edit_message_text(
             ul.to_win(how_many_to_win[self.s]) + '\n' +
-            f'{x_sgn} {name_X}{turn_sgn*self.queue}\n' +
-            f'{o_sgn} {name_O}{turn_sgn*(not self.queue)}',
+            f'{sgn.x} {name_X}{cnst.turn*self.queue}\n' +
+            f'{sgn.o} {name_O}{cnst.turn*(not self.queue)}',
             inline_message_id=self.id,
             reply_markup=self.b.game_Buttons(
-                friend_sgn, choice, user_language=ul
+                choice, cnst.friend, ul
+            )
+        )
+
+    def game_xo_9(self, choice):
+        ul = self.game_language()
+        name_X = self.plX.first_name
+        name_O = self.plO.first_name
+        last_turn = ()
+        if choice and choice[0] != 9:
+            last_turn = choice
+            self.b[choice] = game_signs[self.queue]
+            self.b.s_value = self.b.small_value(True)
+            if self.b.winxo(self.b[choice]):
+                return self.end('win', choice)
+            elif not self.b:
+                return self.end('tie', choice)
+        if sgn.x in str(self.b) or sgn.o in str(self.b):
+            self.queue = int(not self.queue)  # pass turn
+        elif choice:
+            last_turn = choice[2:]*2
+        self.push()
+        return bot.edit_message_text(
+            self.b.board_text(last_turn) + '\n\n' +
+            f'{sgn.x} {name_X}{cnst.turn*self.queue}\n' +
+            f'{sgn.o} {name_O}{cnst.turn*(not self.queue)}',
+            inline_message_id=self.id,
+            reply_markup=self.b.game_Buttons(
+                choice, cnst.friend, ul
             )
         )
 
@@ -652,7 +793,6 @@ class xo:
             parse_mode='Markdown'
         )
         self.Timeout(30, g_type)
-        return 1
 
 
 def free(board_cell):
@@ -661,6 +801,10 @@ def free(board_cell):
 
 def merge_user_languages(k1, k2):
     return lambda n: k1(n) + '\n' + k2(n)
+
+
+def join(strg, arr_to_str):
+    return strg.join(map(str, arr_to_str))
 
 
 def InlineButtons(Buttons, width=3):
@@ -676,8 +820,8 @@ def InlineButtons(Buttons, width=3):
 
 def main_menu_Buttons():
     return InlineButtons([
-        [x_sgn, repeat_sgn + x_sgn],
-        [o_sgn, repeat_sgn + o_sgn]
+        [sgn.x, cnst.repeat + sgn.x],
+        [sgn.o, cnst.repeat + sgn.o]
     ])
 
 

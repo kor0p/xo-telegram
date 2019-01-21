@@ -25,7 +25,7 @@ def main(argv):
             text = arg
 
     import time
-    from config import xo, bot, time_sgn
+    from config import xo, bot, cnst
     g = xo(id)
     _time = int(_time)
     text = text.split('\n', maxsplit = 1)
@@ -47,7 +47,7 @@ def main(argv):
             time.sleep(5)
         if len(text) > 1:
             return g.end(text[0], None, text=text[1])
-        return g.end(text[0], None, text=time_sgn)
+        return g.end(text[0], None, text=cnst.time)
 
 
 if __name__ == "__main__":

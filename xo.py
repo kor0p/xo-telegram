@@ -1,17 +1,29 @@
 import telebot
 from config import *
 from random import randint
-random_list = (randint(3, 8) for i in range(10000))
+random_list = (randint(3, 10) for i in range(10000))
 
 
 @bot.callback_query_handler(search_callback('reset_start'))
+def start_callback(c):
+    pl = tg_user(c.from_user)
+    ul = pl.lang()  # ul for user language
+    bot.answer_callback_query(
+        c.id,
+        text=ul.start_pl_2
+    )
+    bot.send_message(
+        pl.id,
+        ul.start,
+        reply_markup=main_menu_Buttons()
+    )
+
+
 @bot.message_handler(commands=['start', 'new', 'game'])
 def start(message):
     pl = tg_user(message.from_user)
     ul = pl.lang()  # ul for user language
-    try:
-        if 'new' not in message.text:
-            pass
+    if 'new' in message.text:
         bot.delete_message(
             pl.id,
             bot.send_message(
@@ -19,17 +31,8 @@ def start(message):
                 ul.start,
                 reply_markup=telebot.types.
                 ReplyKeyboardRemove(selective=False)
-            )   .message_id,
+            ).message_id,
         )
-    except:
-        pass
-    try:
-        bot.answer_callback_query(
-            message.id,
-            text=ul.start_pl_2
-        )
-    except:
-        pass
     bot.send_message(
         pl.id,
         ul.start,
@@ -44,21 +47,20 @@ def start_xo_text(c):
     ul = pl.lang()
     g = xo_text(pl.id, new=True)
     name = pl.first_name
-    if text == x_sgn:
-        text_out = f'{x_sgn} {name}{turn_sgn}\n' +\
-            f'{o_sgn} {ul.bot}'
-        g.isX = 1
-        g.b = Board(cell * 9)
-    elif text == o_sgn:
-        text_out = f'{x_sgn} {ul.bot}\n' +\
-            f'{o_sgn} {name}{turn_sgn}'
-        g.isX = 0
-        g.b = Board(cell * 4 + x_sgn + cell * 4)
+    g.b = Board(sgn.cell * 9)
+    if text == sgn.x:
+        text_out = f'{sgn.x} {name}{cnst.turn}\n' +\
+            f'{sgn.o} {ul.bot}'
+        g.isX = 1 # by default isX is 0
+    elif text == sgn.o:
+        text_out = f'{sgn.x} {ul.bot}\n' +\
+            f'{sgn.o} {name}{cnst.turn}'
+        g.b[0][0] = sgn.x
     bot.edit_message_text(
         text_out,
         pl.id,
         c.message.message_id,
-        reply_markup=g.b.game_Buttons(robot_sgn, -1)
+        reply_markup=g.b.game_Buttons((), cnst.repeat)
     )
     g.push()
 
@@ -95,16 +97,16 @@ def main_xo_text(c):
         g.b[bot_choice] = bot_sign
     name_X = [ul.bot, player][g.isX]
     name_O = [ul.bot, player][not g.isX]
-    for s in x_sgn, o_sgn:
-        queue = int(s != o_sgn)
+    for s in sgn.x, sgn.o:
+        queue = int(s != sgn.o)
         if g.b.winxo(s):
-            b_text = g.b.board_text(-1)
+            b_text = g.b.board_text()
             sign_X = end_signs[queue]
             sign_O = end_signs[not queue]
             bot.edit_message_text(
                 b_text +
-                f'\n{x_sgn} {name_X} {sign_X}' +
-                f'\n{o_sgn} {name_O} {sign_O}\n' +
+                f'\n{sgn.x} {name_X} {sign_X}' +
+                f'\n{sgn.o} {name_O} {sign_O}\n' +
                 ul.new,
                 m.chat.id,
                 m.message_id,
@@ -112,10 +114,10 @@ def main_xo_text(c):
             )
             return g.dlt()
     if not g.b:
-        b_text = g.b.board_text(-1)
+        b_text = g.b.board_text()
         bot.edit_message_text(
             b_text +
-            f'\n{x_sgn}{name_X} {tie_sgn} {name_O}{o_sgn}\n' +
+            f'\n{sgn.x}{name_X} {cnst.tie} {name_O}{sgn.o}\n' +
             ul.new + '\n',
             m.chat.id,
             m.message_id,
@@ -123,11 +125,11 @@ def main_xo_text(c):
         )
         return g.dlt()
     bot.edit_message_text(
-        f'{x_sgn} {name_X}{turn_sgn*g.isX}\n' +
-        f'{o_sgn} {name_O}{turn_sgn*(not g.isX)}',
+        f'{sgn.x} {name_X}{cnst.turn*g.isX}\n' +
+        f'{sgn.o} {name_O}{cnst.turn*(not g.isX)}',
         m.chat.id,
         m.message_id,
-        reply_markup=g.b.game_Buttons(robot_sgn, -1)
+        reply_markup=g.b.game_Buttons((), cnst.repeat)
     )
     g.push()
 
@@ -139,7 +141,7 @@ def inline_query(q):
     ul = pl.lang()
     query = q.query.lower()
     s = 0
-    for i in range(3, 8):
+    for i in range(3, 10):
         if str(i) in query:
             s = i
             query = query.replace(str(i), '')
@@ -150,10 +152,10 @@ def inline_query(q):
     button = InlineButtons(
         tuple(
             (f'{i}', f'start{i}')
-            for i in range(3, 9)
+            for i in range(3, 10)
         )+(
             (ul.random, 'start0'),
-        )
+        ), width = 4
     )
     res = (
         telebot.types.InlineQueryResultCachedSticker(
@@ -181,7 +183,12 @@ def chosen_inline_query(cr):
     if g.s == 0:
         g.push()
         return 1
-    g.b = Board(''.join([cell for i in range(g.s**2)]))
+    g.Timeout((g.s**2)*30, '_')
+    if g.s == 9:
+        _Board = Board_9
+    else:
+        _Board = Board
+    g.b = _Board(''.join([sgn.cell]*g.s**2))
     g.game_xo(())
     g.push()
 
@@ -192,21 +199,18 @@ def choice_size(c):
     g.s = int(c.data[-1])
     if g.s == 0:
         g.s = next(random_list)
-    g.b = Board(''.join([cell for i in range(g.s**2)]))
+    g.Timeout((g.s**2)*30, '_')
+    if g.s == 9:
+        _Board = Board_9
+    else:
+        _Board = Board
+    g.b = _Board(''.join([sgn.cell]*g.s**2))
     if not g.plX and g.plO.id != c.from_user.id:
         g.plX = tg_user(c.from_user)
     elif not g.plO and g.plX.id != c.from_user.id:
         g.plO = tg_user(c.from_user)
-    name_X = g.plX.first_name
-    name_O = g.plO.first_name
-    button = g.b.game_Buttons(friend_sgn, -1)
-    bot.edit_message_text(
-        f'{x_sgn} {name_X}{turn_sgn}\n' +
-        f'{o_sgn} {name_O}',
-        inline_message_id=g.id,
-        reply_markup=button
-    )
     g.push()
+    g.game_xo(())
 
 
 @bot.callback_query_handler(search_callback('confirm/end'))
@@ -237,7 +241,7 @@ def confirm_or_end(c):
         if g.plX and g.plO and\
             pl.id in (g.plX.id, g.plO.id) and\
                 g.tie_id != pl.id:
-            return g.end('tie', None)
+            return g.end('tie')
         return bot.answer_callback_query(
             c.id,
             ul_this.dont_touch,
@@ -246,7 +250,7 @@ def confirm_or_end(c):
     elif g.giveup_user:
         if g.giveup_user.id == pl.id and (g.plO or g.plX):
             g.queue = int(g.plO.id == pl.id)
-            return g.end('giveup', None)
+            return g.end('giveup')
         return bot.answer_callback_query(
             c.id,
             ul_this.dont_touch,
@@ -285,13 +289,14 @@ def main_xo(c):
     name_X = g.plX.first_name
     name_O = g.plO.first_name
     ul = g.game_language()
-    if not free(c.data[1:]):
+    choice = tuple(map(int, c.data[1:]))
+    if (not free(c.data[1:]) and choice[0] != 9) or\
+            c.data[1:] == cnst.lock:
         return bot.answer_callback_query(
             c.id,
             text=ul.dont_touch,
             show_alert=True
         )
-    choice = tuple(map(int, c.data[1:]))
     if (g.plX or g.plO) and\
         ((pl == g.plX and not g.queue) or
          (pl == g.plO and g.queue)):
@@ -315,6 +320,7 @@ def main_xo(c):
         return g.game_xo(())
     return bot.answer_callback_query(c.id, text=ul.stop_game)
 
-#webhook_func(bot)
+
+# webhook_func(bot)
 bot.remove_webhook()
 bot.polling(none_stop=True)
