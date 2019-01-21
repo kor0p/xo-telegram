@@ -289,13 +289,13 @@ def main_xo(c):
     name_X = g.plX.first_name
     name_O = g.plO.first_name
     ul = g.game_language()
-    choice = tuple(map(int, c.data[1:]))
     if not free(c.data[1:]) or c.data[1:] == cnst.lock:
         return bot.answer_callback_query(
             c.id,
             text=ul.dont_touch,
             show_alert=True
         )
+    choice = tuple(map(int, c.data[1:]))
     if (g.plX or g.plO) and\
         ((pl == g.plX and not g.queue) or
          (pl == g.plO and g.queue)):
