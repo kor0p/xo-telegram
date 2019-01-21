@@ -290,8 +290,7 @@ def main_xo(c):
     name_O = g.plO.first_name
     ul = g.game_language()
     choice = tuple(map(int, c.data[1:]))
-    if (not free(c.data[1:]) and choice[0] != 9) or\
-            c.data[1:] == cnst.lock:
+    if not free(c.data[1:]) or c.data[1:] == cnst.lock:
         return bot.answer_callback_query(
             c.id,
             text=ul.dont_touch,

@@ -316,9 +316,9 @@ class Board:
             ((0, 0), (2, 2), (1, 2), (0, 1))
         ):
             if (free(self[r]) and
-                    self[i] == user_sgn and
-                    user_sgn in (self[j], self[k])
-                    ):
+                self[i] == user_sgn and
+                user_sgn in (self[j], self[k])
+                ):
                 return r
         for i, j, k, l, r in (
             ((1, 0), (2, 2), (1, 2), (2, 0), (2, 1)),
@@ -495,7 +495,11 @@ class Board_9(Board):
                  str(
                     (board[i][j],
                      f'{l_t[0]}{l_t[1]}{i}{j}'
-                     )[board[i][j] == sgn.cell]
+                     )[
+                        not board or
+                        l_t[0] == 9 or
+                        board[i][j] == sgn.cell
+                    ]
                 )
                 )
                 for i in range(3)
