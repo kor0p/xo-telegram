@@ -125,7 +125,7 @@ def search_callback(to_find):
             'reset_start': cnst.repeat * 2,
             'start': cnst.repeat + f'[{sgn.x}|{sgn.o}]',
             'choice_size': 'start\d',
-            'text': cnst.repeat + f'[\d\d|{sgn.x}|{sgn.o}]',
+            'text': cnst.robot + f'[\d\d|{sgn.x}|{sgn.o}]',
             'friend': cnst.friend + f'[\d\d|{sgn.x}|{sgn.o}|{cnst.lock}]',
             'confirm/end': 'cancel|tie|giveup|confirm'
         }[to_find],
@@ -377,11 +377,11 @@ class Board:
                 }
             ] + [[
                 {
-                    'text': cnst.repeat,
+                    'text': cnst.robot,
                     'callback': cnst.repeat * 2
                 },
                 {
-                    'text': cnst.repeat,
+                    'text': cnst.robot,
                     'url': 't.me/m0xbot?start=1'
                 }
             ][current_chat]
