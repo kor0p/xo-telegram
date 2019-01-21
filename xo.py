@@ -55,12 +55,12 @@ def start_xo_text(c):
     elif text == sgn.o:
         text_out = f'{sgn.x} {ul.bot}\n' +\
             f'{sgn.o} {name}{cnst.turn}'
-        g.b[0][0] = sgn.x
+        g.b[1][1] = sgn.x
     bot.edit_message_text(
         text_out,
         pl.id,
         c.message.message_id,
-        reply_markup=g.b.game_Buttons((), cnst.repeat)
+        reply_markup=g.b.game_Buttons((), cnst.robot)
     )
     g.push()
 
@@ -129,7 +129,7 @@ def main_xo_text(c):
         f'{sgn.o} {name_O}{cnst.turn*(not g.isX)}',
         m.chat.id,
         m.message_id,
-        reply_markup=g.b.game_Buttons((), cnst.repeat)
+        reply_markup=g.b.game_Buttons((), cnst.robot)
     )
     g.push()
 
