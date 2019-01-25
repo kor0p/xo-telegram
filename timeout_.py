@@ -6,13 +6,18 @@ def main(argv):
     inputfile = ''
     outputfile = ''
     try:
-        opts, args = getopt.getopt(argv, "hi:t:x:", ["id=", "time=", "text="])
+        opts, args = getopt.getopt(
+            argv,
+            "hi:t:x:l:",
+            ["id=", "time=", "text=", "last_turn="]
+        )
     except getopt.GetoptError:
-        print('test.py -i <id> -t <time> -x <text>')
+        print('test.py -i <id> -t <time> -x <text> -l <last_turn>')
         sys.exit(2)
     id = 0
     _time = 0
     text = ''
+    last_turn = ()
     for opt, arg in opts:
         if opt == '-h':
             print('test.py -i <id> -t <time> -x <text>')
@@ -20,15 +25,16 @@ def main(argv):
         elif opt in ("-i", "--id"):
             id = arg
         elif opt in ("-t", "--time"):
-            _time = arg
+            _time = int(arg)
         elif opt in ("-x", "--text"):
             text = arg
+        elif opt in ("-l", "--last_turn"):
+            last_turn = tuple(map(int,arg))
 
     import time
     from config import xo, bot, cnst
     g = xo(id)
-    _time = int(_time)
-    text = text.split('\n', maxsplit = 1)
+    text = text.split('\n', maxsplit=1)
     if _time < 10:
         time.sleep(_time)
     else:
@@ -46,8 +52,8 @@ def main(argv):
         if _time > 10:
             time.sleep(5)
         if len(text) > 1:
-            return g.end(text[0], None, text=text[1])
-        return g.end(text[0], None, text=cnst.time)
+            return g.end(text[0], last_turn, text[1])
+        return g.end(text[0], last_turn, cnst.time)
 
 
 if __name__ == "__main__":

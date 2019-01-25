@@ -221,14 +221,15 @@ def confirm_or_end(c):
     name_O = g.plO.first_name
     ul = g.game_language()
     ul_this = pl.lang()
-    if c.data == 'cancelend':
+    choice = c.data[-4:]
+    if 'cancelend' in c.data:
         if pl.id in (g.plX.id, g.plO.id):
             g.tie_id = 0
-            g.giveup_user = tg_user(tg_user_default)
-            return g.game_xo(())
+            g.giveup_user = tg_user()
+            return g.game_xo(tuple(map(int, choice)))
         return bot.answer_callback_query(
             c.id,
-            ul_this.dont_touch,
+            ul_this.stop_game,
             show_alert=True
         )
     elif c.data == 'cancelstart':
@@ -241,39 +242,40 @@ def confirm_or_end(c):
         if g.plX and g.plO and\
             pl.id in (g.plX.id, g.plO.id) and\
                 g.tie_id != pl.id:
-            return g.end('tie')
+            return g.end('tie', tuple(map(int, choice)))
         return bot.answer_callback_query(
             c.id,
-            ul_this.dont_touch,
+            ul_this.stop_game,
             show_alert=True
         )
     elif g.giveup_user:
-        if g.giveup_user.id == pl.id and (g.plO or g.plX):
-            g.queue = int(g.plO.id == pl.id)
-            return g.end('giveup')
+        if pl == g.giveup_user and (g.plO or g.plX):
+            #g.queue = int(pl == g.plO)
+            return g.end('giveup', tuple(map(int, choice)))
         return bot.answer_callback_query(
             c.id,
-            ul_this.dont_touch,
+            ul_this.stop_game,
             show_alert=True
         )
-    elif c.data == 'tie':
+    elif 'tie' in c.data:
         if g.plX and g.plO and\
                 pl.id in (g.plX.id, g.plO.id):
             g.tie_id = pl.id
             g.push()
-            return g.Timeout_confirm('tie', pl)
+            return g.Timeout_confirm('tie', pl, choice)
         return bot.answer_callback_query(
             c.id,
             ul_this.dont_touch,
             show_alert=True
         )
-    elif c.data == 'giveup':
+    elif 'giveup' in c.data:
         if (g.plX or g.plO) and\
                 pl.id in (g.plX.id, g.plO.id):
             g.giveup_user = pl
-            g.queue = int(not g.queue)
+            if choice[0] != '9':
+                g.queue = int(not g.queue)
             g.push()
-            return g.Timeout_confirm('giveup', pl)
+            return g.Timeout_confirm('giveup', pl, choice)
         return bot.answer_callback_query(
             c.id,
             ul_this.dont_touch,
@@ -288,28 +290,30 @@ def main_xo(c):
     g = xo(c.inline_message_id)
     name_X = g.plX.first_name
     name_O = g.plO.first_name
-    ul = g.game_language()
+    ul_this = pl.lang()
     if not free(c.data[1:]) or c.data[1:] == cnst.lock:
         return bot.answer_callback_query(
             c.id,
-            text=ul.dont_touch,
+            text=ul_this.dont_touch,
             show_alert=True
         )
+    if c.data[1:3] == '99':
+        bot.answer_callback_query(c.id, text=ul_this.start9)
     choice = tuple(map(int, c.data[1:]))
     if (g.plX or g.plO) and\
         ((pl == g.plX and not g.queue) or
          (pl == g.plO and g.queue)):
-        return bot.answer_callback_query(c.id, text=ul.stop)
+        return bot.answer_callback_query(c.id, text=ul_this.stop)
     if not g.plX and g.queue and pl != g.plO:
         g.plX = tg_user(c.from_user)
-        bot.answer_callback_query(c.id, text=ul.start_pl_2)
+        bot.answer_callback_query(c.id, text=ul_this.start_pl_2)
     if g.plX and pl == g.plX:
         if g.queue:
             return g.game_xo(choice)
-        return bot.answer_callback_query(c.id, text=ul.stop)
+        return bot.answer_callback_query(c.id, text=ul_this.stop)
     elif g.plX and not g.plO:
         first_turn = True
-        bot.answer_callback_query(c.id, text=ul.start_pl_2)
+        bot.answer_callback_query(c.id, text=ul_this.start_pl_2)
         g.plO = tg_user(c.from_user)
         name_O = g.plO.first_name
         g.push()
@@ -317,7 +321,7 @@ def main_xo(c):
         return g.game_xo(choice)
     if first_turn:
         return g.game_xo(())
-    return bot.answer_callback_query(c.id, text=ul.stop_game)
+    return bot.answer_callback_query(c.id, text=ul_this.stop_game)
 
 
 # webhook_func(bot)
