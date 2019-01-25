@@ -21,4 +21,4 @@ Telegram bot for Tictactoe game
 
 Done with using [pyTelegramBotAPI](https://www.github.com/eternnoir/pyTelegramBotAPI)
 
-—— Version 4.0.4 ——
+—— Version 4.0.5 ——

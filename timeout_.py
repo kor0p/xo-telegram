@@ -51,6 +51,7 @@ def main(argv):
     ):
         if _time > 10:
             time.sleep(5)
+        g.pull()
         if len(text) > 1:
             return g.end(text[0], last_turn, text[1])
         return g.end(text[0], last_turn, cnst.time)

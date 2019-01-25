@@ -45,7 +45,7 @@ langs = {
         'startN': 'Choose size and get started!',
         'random': 'Random',
         'timeout': lambda s: f'Seconds remains: {s}',
-        'start9': 'It\'s first turn, keep going!',
+        'start9': 'It\'s double-turn, keep going!',
         'rules': 'Rules'
     }, 'uk': {
         'start': 'Обирай сторону і почнімо!',
@@ -67,7 +67,7 @@ langs = {
         'startN': 'Обирай тип і до бою!',
         'random': 'Однаково',
         'timeout': lambda s: f'Секунд лишилось: {s}',
-        'start9': 'Перший хід ще триває, продовжуй!',
+        'start9': 'Твій хід ще триває, продовжуй!',
         'rules': 'Правила'
     }, 'ru': {
         'start': 'Выбери сторону и начнём!',
@@ -89,7 +89,7 @@ langs = {
         'startN': 'Выбери тип и к бою!',
         'random': 'Рандом',
         'timeout': lambda s: f'Секунд осталось: {s}',
-        'start9': 'Ход ещё не кончился, продолжай!',
+        'start9': 'Этот ход ещё не кончился, продолжай!',
         'rules': 'Правила'
     }
 }
@@ -249,7 +249,7 @@ class Board(Row):
             self.value[key[0]][key[1]] = item
 
     def __bool__(self):
-        return (sgn.cell in str(self.value))
+        return (sgn.cell in str(self))
 
     def last_of_three(self, a, b, c, sign):
         for x, y, z in [[a, b, c], [c, a, b], [b, c, a]]:
@@ -288,16 +288,15 @@ class Board(Row):
     def bot_choice_func(self, bot_sgn, user_sgn):
         if not self:
             return []
-        for s in [bot_sgn, user_sgn]:
-            for x, y, z in (
-                ((0, 0), (1, 1), (2, 2)),  # . 0 1 2
-                ((0, 2), (1, 1), (2, 0)),  # 0 . . .
-                ((0, 0), (1, 0), (2, 0)),  # 1 . . .
-                ((0, 0), (0, 1), (0, 2)),  # 2 . . .
-                ((0, 1), (1, 1), (2, 1)),
-                ((1, 0), (1, 1), (1, 2)),
-                ((0, 2), (1, 2), (2, 2)),
-                ((2, 0), (2, 1), (2, 2))
+        for s in [bot_sgn, user_sgn]:      # . 0 1 2
+            for x, y, z in (               # 0 . . .
+                ((0, 0), (1, 1), (2, 2)),  # 1 . . .
+                ((0, 2), (1, 1), (2, 0)),  # 2 . . .
+                *zip(*(
+                    zip(*(
+                    ((i, j), (j, i))
+                    for j in range(3)))
+                    for i in range(3)))
             ):
                 res = self.last_of_three(x, y, z, s)
                 if res:
@@ -325,7 +324,7 @@ class Board(Row):
                 self[k] == self[l] == user_sgn
             ):
                 return r
-        # lasr hope :)
+        # last hope :)
         for i in range(3):
             for j in range(3):
                 if free(self[i][j]):
@@ -472,7 +471,10 @@ class Board_9(Board):
                      ):
         if l_t:
             board = self[l_t[2:]]
-            if not board:
+            if not board or (
+                len(re.findall(sgn.cell, str(board))) == 1 and
+                str(board).index(sgn.cell) == l_t[0]*3+l_t[1]
+            ):
                 l_t = ()
                 board = self.small_value()
         else:
@@ -504,8 +506,8 @@ class Board_9(Board):
         )
         markup.add(telebot.types.InlineKeyboardButton(
             user_language.rules,
-            url = 'https://mathwithbaddrawings.com/2013/06/16/ultimate-tic-tac-toe/'
-            ))
+            url='https://mathwithbaddrawings.com/2013/06/16/ultimate-tic-tac-toe/'
+        ))
         return markup
 
 
@@ -686,14 +688,14 @@ class xo:
         name_X = self.plX.first_name
         name_O = self.plO.first_name
         ul = self.game_language()
-        if g_type in ('win','giveup'):
+        if g_type == 'giveup':
             self.queue = int(self.giveup_user == self.plO)
         text += '\n'
         if g_type == 'tie':
             text +=\
                 f'{sgn.x} {name_X} {cnst.tie} {name_O} {sgn.o}\n' +\
                 ul.cnld*bool(self.b)
-        elif g_type in ('win','giveup'):
+        elif g_type in ('win', 'giveup'):
             text +=\
                 f'{sgn.x} {name_X} {end_signs[self.queue]}\n' +\
                 f'{sgn.o} {name_O} {end_signs[not self.queue]}\n'
@@ -711,7 +713,7 @@ class xo:
             reply_markup=button
         )
         if index_last_turn:
-            self.Timeout(5, g_type+'\n')
+            self.Timeout(5, '\n'+text)
         else:
             self.dlt()
 
@@ -772,7 +774,7 @@ class xo:
     def Timeout(self, temp_time, g_type, last_turn=()):
         system(
             'python3 timeout_.py -i {} -t {} -x "{}" -l "{}" &'.format(
-                self.id, temp_time, g_type, ''.join(map(str,last_turn))
+                self.id, temp_time, g_type, ''.join(map(str, last_turn))
             )
         )
 
@@ -788,7 +790,7 @@ class xo:
         ))
         bot.edit_message_text(
             f'<a href="tg://user?id={_user.id}">{_user.first_name}</a>,\n{text}',
-            #f'[{_user.first_name}](tg://user?id={_user.id}),\n{text}',
+            # f'[{_user.first_name}](tg://user?id={_user.id}),\n{text}',
             inline_message_id=self.id,
             reply_markup=buttons,
             parse_mode='HTML'
