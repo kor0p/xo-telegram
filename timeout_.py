@@ -44,14 +44,12 @@ def main(argv):
             if not g:
                 return 0
     g.pull()
-    if _time > 60 or _time < 10 or not(
-        not g or not(
-            g.tie_id or bool(g.giveup_user)
-        )
-    ):
+    if _time > 60 or _time < 10 or bool(g):
         if _time > 10:
             time.sleep(5)
         g.pull()
+        if not g:
+            return 0
         if len(text) > 1:
             return g.end(text[0], last_turn, text[1])
         return g.end(text[0], last_turn, cnst.time)

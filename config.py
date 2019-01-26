@@ -664,7 +664,7 @@ class xo:
             WHERE id = ?
             ''', (self.id,)
         )
-        return bool(tuple(Cur))
+        return bool(bool(tuple(Cur)) and (self.tie_id or bool(self.giveup_user)))
 
     def __repr__(self):
         return str(self.__dict__)
