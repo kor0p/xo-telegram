@@ -2,6 +2,7 @@ import telebot
 import cherrypy
 import threading
 import sqlite3
+import json
 import re
 from os import system
 from random import choice
@@ -99,11 +100,12 @@ languages = {k: lang(*langs[k].values()) for k in langs}
 
 # constants
 how_many_to_win = {
-    3: 3,
-    4: 4, 5: 4, 6: 4,
+    2: 2,
+    3: 3, 4: 3,
+    5: 4, 6: 4,
     7: 5, 8: 5
 }
-
+list_of_sizes = (4, 9, 16, 3, 5, 6, 7, 8)
 signs = namedtuple('signs', ('cell', 'x', 'o'))
 sgn = signs('⬜', '❌', '⭕')
 new_sgn = signs('◻', '✖', '🔴')
@@ -122,7 +124,7 @@ new_game_signs = {
     new_sgn.cell: sgn.cell
 }
 
-tg_user_default = {'id': 0, 'first_name': '?', 'language_code': 'en'}
+tg_user_default = {'id': 0, 'first_name': '?', 'username': '', 'language_code': 'en'}
 
 
 def search_callback(to_find):
@@ -175,15 +177,17 @@ def webhook_func(bot):
 class tg_user:
 
     def __init__(self, d=tg_user_default):
-        if type(d) == str:
+        if isinstance(d, str):
             d = eval(d)
-        if type(d) == dict:
+        if isinstance(d, dict):
             self.id = d['id']
             self.first_name = d['first_name']
+            self.username = d['username']
             self.language_code = d['language_code']
             return None
         self.id = d.id
         self.first_name = d.first_name
+        self.username = d.username
         self.language_code = d.language_code
 
     def __repr__(self):
@@ -212,13 +216,13 @@ class tg_user:
 class Row:
 
     def __init__(self, board):
-        if type(board) == str:
+        if isinstance(board, str):
             board = list(board)
         self.value = board
-        self.size = 3
+        self.size = int(len(board)**.5)
 
     def __getitem__(self, key):
-        if type(key) == tuple:
+        if isinstance(key, tuple):
             return self.value[key[0]][key[1]]
         return self.value[key]
 
@@ -238,14 +242,14 @@ class Board(Row):
 
     def __init__(self, _board=''):
         self.size = s = int(len(_board)**(.5))
-        assert 9 > self.size > 2 or not self.size
+        assert 9 > self.size > 1 or not self.size
         self.value = [
             Row(_board[i*s:(i+1)*s])
             for i in range(s)
         ]
 
     def __setitem__(self, key, item):
-        if key and type(key) == tuple:
+        if key and isinstance(key, tuple):
             self.value[key[0]][key[1]] = item
 
     def __bool__(self):
@@ -260,7 +264,7 @@ class Board(Row):
     def board_text(self, last_turn=None):
         if last_turn:
             self[last_turn] = new_game_signs[self[last_turn]]
-        b = join('\n', [self[i] for i in range(self.size)])
+        b = join('\n', [self[i] for i in range(self.size)])+'\n'
         if last_turn:
             self[last_turn] = new_game_signs[self[last_turn]]
         return b
@@ -292,11 +296,8 @@ class Board(Row):
             for x, y, z in (               # 0 . . .
                 ((0, 0), (1, 1), (2, 2)),  # 1 . . .
                 ((0, 2), (1, 1), (2, 0)),  # 2 . . .
-                *zip(*(
-                    zip(*(
-                    ((i, j), (j, i))
-                    for j in range(3)))
-                    for i in range(3)))
+                *(((i, j) for j in range(3)) for i in range(3)),
+                *(((j, i) for j in range(3)) for i in range(3))
             ):
                 res = self.last_of_three(x, y, z, s)
                 if res:
@@ -309,9 +310,9 @@ class Board(Row):
             ((0, 0), (2, 2), (1, 2), (0, 1))
         ):
             if (free(self[r]) and
-                        self[i] == user_sgn and
-                        user_sgn in (self[j], self[k])
-                    ):
+                    self[i] == user_sgn and
+                    user_sgn in (self[j], self[k])
+                ):
                 return r
         for i, j, k, l, r in (
             ((1, 0), (2, 2), (1, 2), (2, 0), (2, 1)),
@@ -334,6 +335,8 @@ class Board(Row):
                      user_language=tg_user().lang()):
         if last_turn:
             self[last_turn] = new_game_signs[self[last_turn]]
+        if not last_turn:
+            last_turn = (9, 9)
         return InlineButtons(
             tuple(
                 (self[i][j],
@@ -345,9 +348,9 @@ class Board(Row):
             )
             +
             (
-                (user_language.dotie, 'tie'),
-                (user_language.giveup, 'giveup')
-            ) * bool(user_language),
+                (user_language.dotie, f'tie{last_turn[0]}{last_turn[1]}'),
+                (user_language.giveup, f'giveup{last_turn[0]}{last_turn[1]}')
+            ) * bool(user_language) * (game_sign != cnst.robot),
             width=self.size
         )
 
@@ -383,30 +386,30 @@ class Board(Row):
         )
 
 
-class Board_9(Board):
+class Board_Big(Board):
 
     def __init__(self, _board=''):
         if not _board:
             _board = sgn.cell*81
-        self.size = s = 9
+        self.size = s = int(len(_board)**.25)
         self.value = [[
-            Board(_board[(i*3+j)*9:(i*3+j+1)*9])
-            for j in range(3)]
-            for i in range(3)
+            Board(_board[(i*s+j)*(s*s):(i*s+j+1)*(s*s)])
+            for j in range(s)]
+            for i in range(s)
         ]
-        self.s_value = Board(_board[81:])\
-            if len(_board) == 90 else Board('')
+        self.s_value = Board(_board[-s*s:])\
+            if len(_board) == s**4+s**2 else Board('')
 
     def __getitem__(self, key):
         s = self.size
-        if type(key) == tuple:
+        if isinstance(key, tuple):
             if len(key) == 2:
                 return self.value[key[0]][key[1]]
             return self.value[key[0]][key[1]][key[2]][key[3]]
         return Row(self.value[key])
 
     def __setitem__(self, key, item):
-        if key and type(key) == tuple:
+        if key and isinstance(key, tuple):
             if len(key) == 2:
                 self.value[key[0]][key[1]] = item
                 return None
@@ -425,10 +428,10 @@ class Board_9(Board):
             else:
                 arr = list(str(self.s_value))
         if not arr:
-            arr = [sgn.cell]*9
+            arr = [sgn.cell]*self.size**2
         for i in range(self.size):
             for s in game_signs:
-                if self[i//3][i % 3].winxo(s) and\
+                if self[i//self.size][i % self.size].winxo(s) and\
                         arr[i] == sgn.cell:
                     arr[i] = s
         return Board(join('', arr))
@@ -445,9 +448,9 @@ class Board_9(Board):
             ]))
         b = '\n\n'.join(
             ['\n'.join(
-                [join('   ', [self[i][j][k] for j in range(3)])
-                 for k in range(3)]
-            ) for i in range(3)]
+                [join('  ', [self[i][j][k] for j in range(self.size)])
+                 for k in range(self.size)]
+            ) for i in range(self.size)]
         ) + '\n'
         if last_turn:
             self[last_turn] = new_game_signs[self[last_turn]]
@@ -473,7 +476,7 @@ class Board_9(Board):
             board = self[l_t[2:]]
             if not board or (
                 len(re.findall(sgn.cell, str(board))) == 1 and
-                str(board).index(sgn.cell) == l_t[0]*3+l_t[1]
+                str(board).index(sgn.cell) == l_t[0]*self.size+l_t[1]
             ):
                 l_t = ()
                 board = self.small_value()
@@ -492,17 +495,17 @@ class Board_9(Board):
                      board[i][j] == sgn.cell else
                      board[i][j]
                      ))
-                for i in range(3)
-                for j in range(3)
+                for i in range(self.size)
+                for j in range(self.size)
             )
             +
             (
                 (user_language.dotie,
-                    f'tie{l_t[0]}{l_t[1]}{l_t[2]}{l_t[3]}'),
+                    'tie'+join('', l_t)),
                 (user_language.giveup,
-                    f'giveup{l_t[0]}{l_t[1]}{l_t[2]}{l_t[3]}')
+                    'giveup'+join('', l_t))
             ) * bool(user_language),
-            width=3
+            width=self.size
         )
         markup.add(telebot.types.InlineKeyboardButton(
             user_language.rules,
@@ -516,7 +519,7 @@ class xo_text:
     def __init__(self, id, new=False):
         self.id = id
         self.isX = 0
-        self.b = ''
+        self.b = Board()
         Cur.execute(
             '''
                 SELECT *
@@ -532,7 +535,7 @@ class xo_text:
                 INSERT INTO xo_text
                 VALUES (?,?,?)
                 ''', (
-                self.id, str(self.isX), self.b
+                self.id, str(self.isX), str(self.b)
             )
             )
             Conn.commit()
@@ -589,11 +592,11 @@ class xo:
         self._set()
         Cur.execute('''
             INSERT INTO xo
-            VALUES (?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?)
             ''', (
             self.id, str(self.plX), str(self.plO),
             str(self.giveup_user), self.queue,
-            str(self.b), self.s, self.tie_id
+            str(self.b), self.tie_id
         )
         )
         Conn.commit()
@@ -644,16 +647,16 @@ class xo:
     def _set(self, *args,
              plX=tg_user(), plO=tg_user(),
              giveup_user=tg_user(), queue=1,
-             b='', s=3, tie_id=0
+             b='', tie_id=0
              ):
         if args:
-            id, plX, plO, giveup_user, queue, b, s, tie_id = args
+            id, plX, plO, giveup_user, queue, b, tie_id = args
         self.plX = tg_user(plX)
         self.plO = tg_user(plO)
         self.giveup_user = tg_user(giveup_user)
         self.queue = int(queue)
-        self.b = Board_9(b) if int(s) == 9 else Board(b)
-        self.s = int(s)
+        s = int(len(b)**.5)
+        self.b = Board(b) if s < 9 and s != 4 else Board_Big(b)
         self.tie_id = int(tie_id)
 
     def __bool__(self):
@@ -678,7 +681,7 @@ class xo:
             return ul1
         return lang(*(
             (k1 + '\n' + k2
-                if type(k1) == str else
+                if isinstance(k1, str) else
                 (merge_user_languages(k1, k2))
              )
             for k1, k2 in zip(ul1, ul2)
@@ -705,6 +708,8 @@ class xo:
                 f'{sgn.o} {name_O}\n'
         if g_type == 'giveup':
             text += ul.player(self.giveup_user.first_name)
+        if index_last_turn and index_last_turn[0] == 9:
+            index_last_turn = ()
         b_text = self.b.board_text(index_last_turn)
         button = self.b.end_game_Buttons(current_chat=True)
         bot.edit_message_text(
@@ -718,8 +723,8 @@ class xo:
             self.dlt()
 
     def game_xo(self, choice):
-        if self.s == 9:
-            return self.game_xo_9(choice)
+        if isinstance(self.b, Board_Big):
+            return self.game_xo_Big(choice)
         ul = self.game_language()
         name_X = self.plX.first_name
         name_O = self.plO.first_name
@@ -732,8 +737,11 @@ class xo:
         if sgn.x in str(self.b) or sgn.o in str(self.b):
             self.queue = int(not self.queue)  # pass turn
         self.push()
+        print(self.id, ul.to_win(how_many_to_win[self.b.size]) + '\n' +
+              f'{sgn.x} {name_X}{cnst.turn*self.queue}\n' +
+              f'{sgn.o} {name_O}{cnst.turn*(not self.queue)}')
         return bot.edit_message_text(
-            ul.to_win(how_many_to_win[self.s]) + '\n' +
+            ul.to_win(how_many_to_win[self.b.size]) + '\n' +
             f'{sgn.x} {name_X}{cnst.turn*self.queue}\n' +
             f'{sgn.o} {name_O}{cnst.turn*(not self.queue)}',
             inline_message_id=self.id,
@@ -742,7 +750,7 @@ class xo:
             )
         )
 
-    def game_xo_9(self, choice):
+    def game_xo_Big(self, choice):
         ul = self.game_language()
         name_X = self.plX.first_name
         name_O = self.plO.first_name
@@ -789,8 +797,11 @@ class xo:
             (ul.cnl, f'cancelend{l_t}')
         ))
         bot.edit_message_text(
-            f'<a href="tg://user?id={_user.id}">{_user.first_name}</a>,\n{text}',
-            # f'[{_user.first_name}](tg://user?id={_user.id}),\n{text}',
+            (
+                f'[{_user.first_name}](tg://user?id={_user.id})',
+                f'@{_user.username}'
+            )[bool(_user.username)] +
+            f',\n{text}',
             inline_message_id=self.id,
             reply_markup=buttons,
             parse_mode='HTML'

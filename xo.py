@@ -1,7 +1,6 @@
-import telebot
 from config import *
-from random import randint
-random_list = (randint(3, 10) for i in range(10000))
+random_list_size = (choice(list_of_sizes) for i in range(10000))
+random_list = (choice((0,)*29+(1,)) for i in range(10000))
 
 
 @bot.callback_query_handler(search_callback('reset_start'))
@@ -51,7 +50,7 @@ def start_xo_text(c):
     if text == sgn.x:
         text_out = f'{sgn.x} {name}{cnst.turn}\n' +\
             f'{sgn.o} {ul.bot}'
-        g.isX = 1 # by default isX is 0
+        g.isX = 1  # by default isX is 0
     elif text == sgn.o:
         text_out = f'{sgn.x} {ul.bot}\n' +\
             f'{sgn.o} {name}{cnst.turn}'
@@ -80,6 +79,7 @@ def main_xo_text(c):
             text=ul.dont_touch
         )
     choice = tuple(map(int, c.data[1:]))
+    print(g.b,choice)
     g.b[choice] = usr_sign
     try:
         assert g.b[1][1]
@@ -141,25 +141,30 @@ def inline_query(q):
     ul = pl.lang()
     query = q.query.lower()
     s = 0
-    for i in range(3, 10):
+    for i in list_of_sizes:
         if str(i) in query:
             s = i
             query = query.replace(str(i), '')
             break
     if 'r' in query:
-        s = next(random_list)
+        s = next(random_list_size)
         query = query.replace('r', '')
     button = InlineButtons(
         tuple(
-            (f'{i}', f'start{i}')
-            for i in range(3, 10)
+            (f'{i}', f'start{i:02}')
+            for i in list_of_sizes
         )+(
-            (ul.random, 'start0'),
-        ), width = 4
+            (ul.random, 'start00'),
+        ), width=3
     )
+    if next(random_list) or not s:
+        button.add(telebot.types.InlineKeyboardButton(
+            'Підтримати проект',
+            url='https://send.monobank.ua/21gs4e2aR'
+        ))
     res = (
         telebot.types.InlineQueryResultCachedSticker(
-            f'{n}{s}{q.id}',
+            f'{n}{s:02}{q.id}',
             'CAADAgADKQAD-8YTE7geSMCRsyDEAg'*(1-n) +
             'CAADAgADKAAD-8YTE4byaCljfP--Ag'*n,
             reply_markup=button,
@@ -171,7 +176,7 @@ def inline_query(q):
     return bot.answer_inline_query(q.id, res)
 
 
-@bot.chosen_inline_handler(func=lambda cr: cr)
+@bot.chosen_inline_handler
 def chosen_inline_query(cr):
     g = xo(cr.result_id[2:])
     g.upd_id(cr.inline_message_id)
@@ -179,16 +184,13 @@ def chosen_inline_query(cr):
         g.plX = tg_user(cr.from_user)
     elif cr.result_id[0] == '1':
         g.plO = tg_user(cr.from_user)
-    g.s = int(cr.result_id[1])
-    if g.s == 0:
+    s = int(cr.result_id[1:3])
+    if s == 0:
         g.push()
         return 1
-    g.Timeout((g.s**2)*30, '_')
-    if g.s == 9:
-        _Board = Board_9
-    else:
-        _Board = Board
-    g.b = _Board(''.join([sgn.cell]*g.s**2))
+    _Board = Board if s < 9 and s != 4 else Board_Big
+    g.Timeout((s**2)*30, '_')
+    g.b = _Board(''.join([sgn.cell]*s**2))
     g.game_xo(())
     g.push()
 
@@ -196,15 +198,12 @@ def chosen_inline_query(cr):
 @bot.callback_query_handler(search_callback('choice_size'))
 def choice_size(c):
     g = xo(c.inline_message_id)
-    g.s = int(c.data[-1])
-    if g.s == 0:
-        g.s = next(random_list)
-    g.Timeout((g.s**2)*30, '_')
-    if g.s == 9:
-        _Board = Board_9
-    else:
-        _Board = Board
-    g.b = _Board(''.join([sgn.cell]*g.s**2))
+    s = int(c.data[-2:])
+    if s == 0:
+        s = next(random_list_size)
+    g.Timeout((s**2)*30, '_')
+    _Board = Board if s < 9 and s != 4 else Board_Big
+    g.b = _Board(''.join([sgn.cell]*s**2))
     if not g.plX and g.plO.id != c.from_user.id:
         g.plX = tg_user(c.from_user)
     elif not g.plO and g.plX.id != c.from_user.id:
@@ -222,6 +221,10 @@ def confirm_or_end(c):
     ul = g.game_language()
     ul_this = pl.lang()
     choice = c.data[-4:]
+    try:
+        int(choice[0])
+    except:
+        choice = c.data[-2:]
     if 'cancelend' in c.data:
         if pl.id in (g.plX.id, g.plO.id):
             g.tie_id = 0
@@ -250,7 +253,6 @@ def confirm_or_end(c):
         )
     elif g.giveup_user:
         if pl == g.giveup_user and (g.plO or g.plX):
-            #g.queue = int(pl == g.plO)
             return g.end('giveup', tuple(map(int, choice)))
         return bot.answer_callback_query(
             c.id,
@@ -297,13 +299,13 @@ def main_xo(c):
             text=ul_this.dont_touch,
             show_alert=True
         )
-    if c.data[1:3] == '99':
-        bot.answer_callback_query(c.id, text=ul_this.start9)
     choice = tuple(map(int, c.data[1:]))
     if (g.plX or g.plO) and\
         ((pl == g.plX and not g.queue) or
          (pl == g.plO and g.queue)):
         return bot.answer_callback_query(c.id, text=ul_this.stop)
+    if c.data[1:3] == '99':
+        bot.answer_callback_query(c.id, text=ul_this.start9)
     if not g.plX and g.queue and pl != g.plO:
         g.plX = tg_user(c.from_user)
         bot.answer_callback_query(c.id, text=ul_this.start_pl_2)
