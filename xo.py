@@ -79,7 +79,6 @@ def main_xo_text(c):
             text=ul.dont_touch
         )
     choice = tuple(map(int, c.data[1:]))
-    print(g.b,choice)
     g.b[choice] = usr_sign
     try:
         assert g.b[1][1]
@@ -169,14 +168,15 @@ def inline_query(q):
             'CAADAgADKAAD-8YTE4byaCljfP--Ag'*n,
             reply_markup=button,
             input_message_content=telebot.types.
-            InputTextMessageContent(ul.startN)
-        ) for sign, n in [['x', 0], ['o', 1]]
-        if (sign in query) or not query
+            InputTextMessageContent(
+                ul.startN)
+        ) for sign, n in [['o', 0], ['x', 1]]
+        if (not sign in query) or not query
     )
     return bot.answer_inline_query(q.id, res)
 
 
-@bot.chosen_inline_handler
+@bot.chosen_inline_handler(func=lambda cr: cr)
 def chosen_inline_query(cr):
     g = xo(cr.result_id[2:])
     g.upd_id(cr.inline_message_id)
@@ -327,5 +327,6 @@ def main_xo(c):
 
 
 # webhook_func(bot)
-bot.remove_webhook()
-bot.polling(none_stop=True)
+if bot.get_webhook_info().pending_update_count:
+    bot.remove_webhook()
+bot.infinity_polling()

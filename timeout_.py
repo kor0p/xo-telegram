@@ -30,7 +30,6 @@ def main(argv):
             text = arg
         elif opt in ("-l", "--last_turn"):
             last_turn = tuple(map(int,arg))
-
     import time
     from config import xo, bot, cnst
     g = xo(id)
@@ -38,22 +37,22 @@ def main(argv):
     if _time < 10:
         time.sleep(_time)
     else:
-        for _ in range(_time//5):
-            time.sleep(5)
+        for _ in range(_time//10):
+            time.sleep(10)
             g.pull()
             if not g:
-                return 0
+                return 1,0
     g.pull()
     if _time > 60 or _time < 10 or bool(g):
         if _time > 10:
             time.sleep(5)
         g.pull()
         if not g:
-            return 0
+            return 2,0
         if len(text) > 1:
-            return g.end(text[0], last_turn, text[1])
-        return g.end(text[0], last_turn, cnst.time)
+            return 3,g.end(text[0], last_turn, text[1])
+        return 4,g.end(text[0], last_turn, cnst.time)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    print(main(sys.argv[1:]))

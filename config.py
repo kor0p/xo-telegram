@@ -200,8 +200,7 @@ class tg_user:
 
     def lang(self):
         l_code = self.language_code
-        if not l_code:
-            l_code = tg_user_default['language_code']
+        l_code = l_code or tg_user_default['language_code']
         if '-' in l_code:
             l_code = l_code.strip('-')[0]
         return languages[l_code]
@@ -335,8 +334,7 @@ class Board(Row):
                      user_language=tg_user().lang()):
         if last_turn:
             self[last_turn] = new_game_signs[self[last_turn]]
-        if not last_turn:
-            last_turn = (9, 9)
+        last_turn = last_turn or (9, 9)
         return InlineButtons(
             tuple(
                 (self[i][j],
@@ -389,8 +387,7 @@ class Board(Row):
 class Board_Big(Board):
 
     def __init__(self, _board=''):
-        if not _board:
-            _board = sgn.cell*81
+        _board = _board or sgn.cell*81
         self.size = s = int(len(_board)**.25)
         self.value = [[
             Board(_board[(i*s+j)*(s*s):(i*s+j+1)*(s*s)])
@@ -427,8 +424,7 @@ class Board_Big(Board):
                 return self.s_value
             else:
                 arr = list(str(self.s_value))
-        if not arr:
-            arr = [sgn.cell]*self.size**2
+        arr = arr or [sgn.cell]*self.size**2
         for i in range(self.size):
             for s in game_signs:
                 if self[i//self.size][i % self.size].winxo(s) and\
@@ -482,8 +478,7 @@ class Board_Big(Board):
                 board = self.small_value()
         else:
             board = self.small_value()
-        if not l_t:
-            l_t = (9,)*4
+        l_t = l_t or (9,)*4
         markup = InlineButtons(
             tuple(
                 (board[i][j],
@@ -667,12 +662,14 @@ class xo:
             WHERE id = ?
             ''', (self.id,)
         )
-        return bool(bool(tuple(Cur)) and (self.tie_id or bool(self.giveup_user)))
+        return (bool(tuple(Cur)) or self.tie_id or bool(self.giveup_user))
 
     def __repr__(self):
         return str(self.__dict__)
 
-    __str__ = __repr__
+    #__str__ = __repr__
+    def __str__(self):
+        return ', '.join((f"{name} = {value}" for name, value in self.__dict__.items()))
 
     def game_language(self):
         ul1 = self.plX.lang()
@@ -712,7 +709,7 @@ class xo:
             index_last_turn = ()
         b_text = self.b.board_text(index_last_turn)
         button = self.b.end_game_Buttons(current_chat=True)
-        bot.edit_message_text(
+        out = bot.edit_message_text(
             b_text + text,
             inline_message_id=self.id,
             reply_markup=button
@@ -721,6 +718,7 @@ class xo:
             self.Timeout(5, '\n'+text)
         else:
             self.dlt()
+        return out
 
     def game_xo(self, choice):
         if isinstance(self.b, Board_Big):
@@ -737,9 +735,6 @@ class xo:
         if sgn.x in str(self.b) or sgn.o in str(self.b):
             self.queue = int(not self.queue)  # pass turn
         self.push()
-        print(self.id, ul.to_win(how_many_to_win[self.b.size]) + '\n' +
-              f'{sgn.x} {name_X}{cnst.turn*self.queue}\n' +
-              f'{sgn.o} {name_O}{cnst.turn*(not self.queue)}')
         return bot.edit_message_text(
             ul.to_win(how_many_to_win[self.b.size]) + '\n' +
             f'{sgn.x} {name_X}{cnst.turn*self.queue}\n' +
