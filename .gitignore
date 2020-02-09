@@ -1,0 +1,8 @@
+.directory
+
+.idea
+
+bot/xo.db
+bot/config.py
+
+amazon_key.pem
