@@ -1,3 +1,4 @@
 sqlalchemy
 sqlalchemy_mixins
 pyTelegramBotAPI
+psycopg2

@@ -8,7 +8,7 @@
   "environments": {
     "main": {
       "scripts": {
-        "run": "cd bot && python xo.py"
+        "run": "python -m bot.xo"
       }
     }
   }

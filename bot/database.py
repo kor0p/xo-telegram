@@ -28,14 +28,14 @@ class Base(declarative_base(), AllFeaturesMixin):
 
 class XOTEXTDB(Base):
     __tablename__ = 'xo_text'
-    id = db.Column(db.String)
+    id = db.Column(db.String, primary_key=True)
     isX = db.Column(db.SmallInteger)
     b = db.Column(db.String)
 
 
 class XODB(Base):
     __tablename__ = 'xo'
-    id = db.Column(db.String)
+    id = db.Column(db.String, primary_key=True)
     plX = db.Column(db.JSON)
     plO = db.Column(db.JSON)
     giveup_user = db.Column(db.JSON)
@@ -45,4 +45,4 @@ class XODB(Base):
 
 
 Base.set_session(session)
-Base.metadata.create_all()
+db.MetaData(bind=engine).create_all()

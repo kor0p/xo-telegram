@@ -344,7 +344,5 @@ def main_xo(c):
     return bot.answer_callback_query(c.id, text=ul_this.stop_game)
 
 
-# webhook_func()
-bot.remove_webhook()
 # bot.polling(none_stop=True)
 bot.infinity_polling()
