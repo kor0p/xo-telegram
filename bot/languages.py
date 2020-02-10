@@ -107,7 +107,7 @@ class Language:
         return Language(self.language_code, other.language_code)
 
     def __repr__(self):
-        return {k: v.get(self.language_code, v['en']) for k, v in self.data}
+        return str({k: v.get(self.language_code, v['en']) for k, v in self.data.items()})
 
     def __len__(self):
         print('WHY __len__???')

@@ -1,3 +1,4 @@
+from .util import JSON
 from .languages import Language
 
 
@@ -7,13 +8,13 @@ class TGUser:
             self.id = 0
             self.first_name = '?'
             self.username = ''
+            self.language_code = 'en'
             self.lang = Language()
             return
         if isinstance(data, str):
             data = eval(data)
         if isinstance(data, dict):
-            self.__dict__ = data
-            return
+            data = JSON(**data)
         self.id = data.id
         self.first_name = data.first_name
         self.username = data.username
@@ -22,10 +23,13 @@ class TGUser:
         if '-' in data.language_code:
             data.language_code = data.language_code.split('-')[0]
 
+        self.language_code = data.language_code
         self.lang = Language(data.language_code)
 
     def __repr__(self):
-        return str(vars(self))
+        res = dict(**self.__dict__)
+        res.pop('lang')
+        return str(res)
 
     def __bool__(self):
         return self.id != 0

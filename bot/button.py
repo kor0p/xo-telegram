@@ -1,11 +1,12 @@
 from .const import *
+from telebot import types
 
 
 def callback_buttons(buttons, width=3):
-    temp_buttons = telebot.types.InlineKeyboardMarkup(
+    temp_buttons = types.InlineKeyboardMarkup(
         row_width=width if width else len(buttons[0]))
     temp_buttons.add(*[
-        telebot.types.InlineKeyboardButton(
+        types.InlineKeyboardButton(
             button[0],
             callback_data=button[1]
         ) for button in buttons])
@@ -20,10 +21,10 @@ def main_menu_buttons():
 
 
 def inline_buttons_(buttons, width=3):
-    temp_buttons = telebot.types.InlineKeyboardMarkup(
+    temp_buttons = types.InlineKeyboardMarkup(
         row_width=width if width else len(buttons[0]))
     temp_buttons.add(*[
-        telebot.types.InlineKeyboardButton(
+        types.InlineKeyboardButton(
             button['text'],
             url=button.get('url'),
             callback_data=button.get('callback'),
