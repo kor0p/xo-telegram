@@ -13,7 +13,6 @@ class Game:
         self.db = db
         self.id = str(_id)
         self._set()
-        print(self.db.whereAll())
         if self():
             if new:
                 self.delete()
@@ -21,16 +20,13 @@ class Game:
                 self._set(**self().raw())
         if new:
             self.db.create(**self.data())
-        print('__init__', self.db.whereAll(), dir(self), sep='\n')
 
     def __call__(self):
         return self.db.where(id=self.id, deleted_at=None).first()
 
     def push(self):
-        print('pushing...')
         if value := self():
             value.update(**self.data())
-        print(self.db.whereAll())
 
     def _set(self, **kwargs):
         raise NotImplementedError("Base class has no _set method")
@@ -47,7 +43,6 @@ class Game:
         # res = dict((str(d[0]), str(d[1])) for d in self.__dict__.items())
         res = {str(k): str(v) if v is not None else None for k, v in self.__dict__.items()}
         res.pop('db')
-        print('return .data:', res)
         return res
 
 
@@ -57,9 +52,9 @@ class XOText(Game):
     def __init__(self, _id, new=False):
         super().__init__(_id, new, XOTEXTDB)
 
-    def _set(self, id=None, is_x=None, b=None, deleted_at=None):
+    def _set(self, id=None, isX=None, b=None, deleted_at=None):
         self.isX,       self.b,         self.deleted_at = \
-        int(is_x or 0), Board(b or ''), deleted_at
+        int(isX or 0), Board(b or ''), deleted_at
 
 
 class XO(Game):
@@ -72,7 +67,6 @@ class XO(Game):
         if value := self():
             value.update(id=new_id)
             self.id = new_id
-        print('upd id:', self.db.whereAll())
 
     def _set(self, id=None, plX=None, plO=None, giveup_user=None, queue=None, b=None, tie_id=None, deleted_at=None):
         s = int(len(b or '.'*9)**.5)

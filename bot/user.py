@@ -27,7 +27,7 @@ class TGUser:
         self.lang = Language(data.language_code)
 
     def __repr__(self):
-        res = dict(**self.__dict__)
+        res = dict(self.__dict__)
         res.pop('lang')
         return str(res)
 

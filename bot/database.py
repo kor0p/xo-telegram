@@ -53,4 +53,3 @@ class XODB(Base):
 
 Base.set_session(session)
 metadata.create_all()
-print(XODB.whereAll())
