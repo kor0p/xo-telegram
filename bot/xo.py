@@ -1,30 +1,43 @@
+import threading
 import random
 import re
-
 from telebot import types
-from .boards import free
-from .game import *
+
+from .user import TGUser
+from .boards import free, Board, create_board
+from .const import sgn, cnst, game_signs, end_signs
+from .game import bot, XOText, XO, list_of_sizes, main_menu_buttons, callback_buttons
 
 random_list_size = (random.choice(list_of_sizes) for _ in range(10000))
 random_list = (random.choice((0,)*29+(1,)) for _ in range(10000))
 lock = threading.Lock()
 
 
-def search_callback(to_find):
-    return lambda c: re.search(
-        dict(
-            reset_start=cnst.repeat * 2,
-            start=cnst.repeat + f'[{sgn.x}|{sgn.o}]',
-            choice_size=r'start\d',
-            text=cnst.robot + fr'[\d\d|{sgn.x}|{sgn.o}]',
-            friend=cnst.friend + fr'[\d\d|{sgn.x}|{sgn.o}|{cnst.lock}]',
-            confirm_end='cancel|tie|giveup|confirm'
-        )[to_find],
-        c.data
+class Callback:
+    data = dict(
+        reset_start=cnst.repeat * 2,
+        start=cnst.repeat + f'[{sgn.x}|{sgn.o}]',
+        choice_size=r'start\d\d',
+        text=cnst.robot + fr'[\d\d|{sgn.x}|{sgn.o}]',
+        friend=cnst.friend + fr'[\d\d|{sgn.x}|{sgn.o}|{cnst.lock}]',
+        confirm_end='cancel|tie|giveup|confirm',
     )
 
+    def __getattr__(self, key):
+        if key == 'data':
+            return super().__getattribute__(key)
+        item = self.data[key]
 
-@bot.callback_query_handler(search_callback('reset_start'))
+        def _inner(c):
+            r = re.search(item, c.data)
+            return r
+        return _inner
+
+
+callback = Callback()
+
+
+@bot.callback_query_handler(callback.reset_start)
 def start_callback(c):
     pl = TGUser(c.from_user)
     ul = pl.lang  # ul for user language
@@ -60,7 +73,7 @@ def start(message):
     )
 
 
-@bot.callback_query_handler(search_callback('start'))
+@bot.callback_query_handler(callback.start)
 def start_xo_text(c):
     text = c.data[-1]
     pl = TGUser(c.from_user)
@@ -76,9 +89,7 @@ def start_xo_text(c):
     elif text == sgn.o:
         text_out = f'{sgn.x} {ul.bot}\n' +\
             f'{sgn.o} {name}{cnst.turn}'
-        print(g.b)
         g.b[1][1] = sgn.x
-        print(g.b)
     bot.edit_message_text(
         text_out,
         pl.id,
@@ -88,9 +99,8 @@ def start_xo_text(c):
     g.push()
 
 
-@bot.callback_query_handler(search_callback('text'))
+@bot.callback_query_handler(callback.text)
 def main_xo_text(c):
-    print(c)
     m = c.message
     pl = TGUser(c.from_user)
     ul = pl.lang
@@ -160,7 +170,6 @@ def main_xo_text(c):
 
 @bot.inline_handler(lambda q: True)
 def inline_query(q):
-    print(q.id)
     XO(q.id, new=True)
     pl = TGUser(q.from_user)
     ul = pl.lang
@@ -202,7 +211,6 @@ def inline_query(q):
 
 @bot.chosen_inline_handler(func=lambda cr: cr)
 def chosen_inline_query(cr):
-    print(cr, 'CR')
     g = XO(cr.result_id[3:])
     g.upd_id(cr.inline_message_id)
     if cr.result_id[0] == '0':
@@ -219,9 +227,8 @@ def chosen_inline_query(cr):
     g.push()
 
 
-@bot.callback_query_handler(search_callback('choice_size'))
+@bot.callback_query_handler(callback.choice_size)
 def choice_size(c):
-    print(c)
     g = XO(c.inline_message_id)
     s = int(c.data[-2:])
     if s == 0:
@@ -235,7 +242,7 @@ def choice_size(c):
     g.timeout((s ** 2) * 30, '_')
 
 
-@bot.callback_query_handler(search_callback('confirm_end'))
+@bot.callback_query_handler(callback.confirm_end)
 def confirm_or_end(c):
     pl = TGUser(c.from_user)
     g = XO(c.inline_message_id)
@@ -306,7 +313,7 @@ def confirm_or_end(c):
         )
 
 
-@bot.callback_query_handler(search_callback('friend'))
+@bot.callback_query_handler(callback.friend)
 def main_xo(c):
     first_turn = False
     pl = TGUser(c.from_user)
@@ -344,7 +351,5 @@ def main_xo(c):
     return bot.answer_callback_query(c.id, text=ul_this.stop_game)
 
 
-# webhook_func()
-bot.remove_webhook()
 # bot.polling(none_stop=True)
 bot.infinity_polling()

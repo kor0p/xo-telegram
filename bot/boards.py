@@ -1,8 +1,9 @@
+import re
+
 from .user import TGUser
 from .row import *
 from .button import *
 from .const import *
-import re
 
 
 def free(board_cell):
@@ -284,7 +285,7 @@ class BoardBig(Board):
             ) * bool(user_language),
             width=self.size
         )
-        markup.add(telebot.types.InlineKeyboardButton(
+        markup.add(types.InlineKeyboardButton(
             user_language.rules,
             url='https://mathwithbaddrawings.com/2013/06/16/ultimate-tic-tac-toe/'
         ))

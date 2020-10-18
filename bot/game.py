@@ -13,39 +13,36 @@ class Game:
         self.db = db
         self.id = str(_id)
         self._set()
-        print(self.db.whereAll())
-        if self().first():
+        if self():
             if new:
                 self.delete()
             else:
-                self._set(**self().first().raw())
+                self._set(**self().raw())
         if new:
             self.db.create(**self.data())
-        print('__init__', self.db.whereAll(), dir(self), sep='\n')
 
     def __call__(self):
-        return self.db.where(id=self.id, deleted_at=None)
+        return self.db.where(id=self.id, deleted_at=None).first()
 
     def push(self):
-        print('pushing...')
-        self().update(**self.data())
-        print(self.db.whereAll())
+        if value := self():
+            value.update(**self.data())
 
     def _set(self, **kwargs):
-        print('kwargs, but why...:', kwargs)
-        # raise NotImplementedError("Base class has no _set method")
+        raise NotImplementedError("Base class has no _set method")
 
     def delete(self):
-        self().update(deleted_at=sa.sql.func.now())
+        if value := self():
+            value.update(deleted_at=sa.sql.func.now())
         print("Deleted")
 
     def __bool__(self):
-        return bool(self().first())
+        return bool(self())
 
     def data(self):
-        res = {str(k): str(v) for k, v in vars(self).items()}
+        # res = dict((str(d[0]), str(d[1])) for d in self.__dict__.items())
+        res = {str(k): str(v) if v is not None else None for k, v in self.__dict__.items()}
         res.pop('db')
-        print('return .data:', res)
         return res
 
 
@@ -55,9 +52,9 @@ class XOText(Game):
     def __init__(self, _id, new=False):
         super().__init__(_id, new, XOTEXTDB)
 
-    def _set(self, is_x=None, b=None):
-        self.isX,       self.b = \
-        int(is_x or 0), Board(b or '')
+    def _set(self, id=None, isX=None, b=None, deleted_at=None):
+        self.isX,       self.b,         self.deleted_at = \
+        int(isX or 0), Board(b or ''), deleted_at
 
 
 class XO(Game):
@@ -67,24 +64,23 @@ class XO(Game):
         super().__init__(_id, new, XODB)
 
     def upd_id(self, new_id):
-        old_id = self.id
-        self.id = new_id
-        self.db.where(id=old_id).update(**self.data())
-        print('upd id:', self.db.whereAll())
+        if value := self():
+            value.update(id=new_id)
+            self.id = new_id
 
-    def _set(self, plX=None, plO=None, giveup_user=None, queue=None, b=None, tie_id=None):
+    def _set(self, id=None, plX=None, plO=None, giveup_user=None, queue=None, b=None, tie_id=None, deleted_at=None):
         s = int(len(b or '.'*9)**.5)
-        self.plX,    self.plO,    self.giveup_user,    self.queue,      self.b,             self.tie_id  = \
-        TGUser(plX), TGUser(plO), TGUser(giveup_user), int(queue or 1), create_board(b, s), int(tie_id or 0)
+        self.plX,    self.plO,    self.giveup_user,    self.queue,      self.b,             self.tie_id,      self.deleted_at = \
+        TGUser(plX), TGUser(plO), TGUser(giveup_user), int(queue or 1), create_board(b, s), int(tie_id or 0), deleted_at
 
     def __bool__(self):
         return bool(super()) or self.tie_id or bool(self.giveup_user)
 
     def __repr__(self):
-        return str(vars(self))
+        return str(self.__dict__)
 
     def __str__(self):
-        return ', '.join((f"{name} = {value}" for name, value in vars(self).items()))
+        return ', '.join((f"{name} = {value}" for name, value in self.__dict__.items()))
 
     def game_language(self):
         return self.plX.lang + self.plO.lang

@@ -1,25 +1,14 @@
 {
-  "name": "SQLatch",
-  "description": "BatiBots © IoT Lviv",
+  "name": "Telegram xo bot",
+  "description": "© kor0p",
   "image": "",
-  "repository": "https://bitbucket.org/batibots/api.git",
+  "repository": "https://github.com/kor0p/xo-telegram.git",
   "keywords": ["python"],
   "addons": [ "heroku-postgresql" ],
-  "env": {
-    "SECRET_KEY": {
-      "description": "The secret key for the Django application.",
-      "generator": "secret"
-    }
-  },
   "environments": {
     "main": {
       "scripts": {
-        "run": "python bot/xo.py"
-      }
-    },
-    "test": {
-      "scripts": {
-        "test": "python setup.py test",
+        "run": "python -m bot.xo"
       }
     }
   }

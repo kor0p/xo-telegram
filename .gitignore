@@ -2,6 +2,9 @@
 
 .idea
 
+__pycache__
+bot/__pycache__
+bot/locales/__pycache__
 bot/xo.db
 bot/config.py
 
