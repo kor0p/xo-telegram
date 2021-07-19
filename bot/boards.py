@@ -1,205 +1,202 @@
+from __future__ import annotations
+
 import re
+from itertools import permutations
+from typing import Optional, Union, Iterable
 
-from .user import TGUser
-from .row import *
-from .button import *
-from .const import *
+from .languages import Language
+from .row import RowItem, Row, join
+from .button import inline_buttons
+from .const import (
+    CONSTS,
+    UserSigns,
+    how_many_to_win,
+    BIG_GAME_SIZES,
+    inverted_game_signs,
+    URLS,
+    GameType,
+    GameEndAction,
+    Choice,
+    CHOICE_NULL,
+)
+from .utils import callback
 
 
-def free(board_cell):
-    return board_cell not in game_signs
+def is_cell_free(board_cell: str) -> bool:
+    return board_cell == CONSTS.EMPTY_CELL
 
 
-def create_board(board, size):
-    if size < 9 and size != 4:
-        return Board(board)
-    return BoardBig(board)
+class Board(Row):
+    @classmethod
+    def create(cls, board: Union[str, Iterable, int], size: int = 0) -> Board:
+        if isinstance(board, Iterable) and not isinstance(board, str):
+            board = ''.join(board)
+        if isinstance(board, int):
+            size = board
+            board = None
+        if board and not size:
+            size = round(len(board) ** 0.5)
+        size = size or 3
+        if not board:
+            board = CONSTS.EMPTY_CELL * (size ** 2)
 
+        if size in BIG_GAME_SIZES:
+            return BoardBig(board, round(size ** 0.5))
+        return Board(board, size)
 
-class Board(Base):
+    def __init__(self, board: str, size: int = 0):
+        self.size = size
+        self.value = [Row(board[i * size : (i + 1) * size]) for i in range(size)]
 
-    def __init__(self, _board=''):
-        if not _board:
-            _board = sgn.cell * 9
-        s = int(len(_board) ** .5)
-        self.size = s
-        self.value = [
-            Row(_board[i * s:(i + 1) * s])
-            for i in range(s)
-        ]
-
-    def __setitem__(self, key, item):
-        if not key:
-            raise KeyError("It must be int or tuple")
-        if isinstance(key, tuple):
-            self.value[key[0]][key[1]] = item
-        elif isinstance(key, int):
-            self.value[key] = item
+    def __contains__(self, key):
+        return key in str(self.value)
 
     def __bool__(self):
-        return sgn.cell in str(self)
+        return CONSTS.EMPTY_CELL in str(self)
 
-    def last_of_three(self, a, b, c, sign):
-        for x, y, z in ((a, b, c), (c, a, b), (b, c, a)):
-            if self[x] == self[y] == sign and free(self[z]):
+    def free(self, index: RowItem) -> bool:
+        return is_cell_free(self[index])
+
+    def last_of_three(self, sign: str, *positions: Choice) -> Choice:
+        for x, y, z in permutations(positions):
+            if self[x] == self[y] == sign and self.free(z):
                 return z
-        return ()
+        return Choice()
 
-    def board_text(self, last_turn=None):
-        if last_turn:
-            self[last_turn] = new_game_signs[self[last_turn]]
-        b = join('\n', [self[i] for i in range(self.size)]) + '\n'
-        if last_turn:
-            self[last_turn] = new_game_signs[self[last_turn]]
-        return b
+    def set_inverted_value_for_choice(self, choice: Optional[Choice]):
+        if choice is not None:
+            self[choice] = inverted_game_signs[self[choice]]
 
-    def winxo(self, sign):
-        row = how_many_to_win[self.size]
-        # one system for all sizes
-        rowr = range(row)
-        return any([
-            all([self[j + q][i + q] == sign for q in rowr]) or
-            # main diagonal check
-            all([self[j + q][i + row - 1 - q] == sign for q in rowr]) or
-            # collateral diagonal check
-            any([
-                all([self[j + l][i + q] == sign for q in rowr]) or
-                # horizontal lines check
-                all([self[j + q][i + l] == sign for q in rowr])
-                # vertical lines check
-                for l in range(row)
-            ])
-            for i in range(self.size + 1 - row)
-            for j in range(self.size + 1 - row)
-        ])
+    def board_text(self, last_turn: Optional[Choice] = None):
+        self.set_inverted_value_for_choice(last_turn)
+        board = join('\n', (self[i] for i in range(self.size))) + '\n'
+        self.set_inverted_value_for_choice(last_turn)
+        return board
 
-    def bot_choice_func(self, bot_sgn, user_sgn):
+    def check_win_for_sign(self, sign):
+        """one system for all sizes"""
+        win_count = how_many_to_win(self.size)
+
+        board = self.board_text()  # # check for first N turns:
+        if board.count(sign) < win_count:  # if there is less than N count of sign -> no way to have win
+            return
+
+        def all_in_row(cb):
+            return all(self[Choice(cb(q))] == sign for q in range(win_count))
+
+        return any(
+            # main diagonal check                     or collateral diagonal check
+            (all_in_row(lambda q: ((j + q), (i + q))) or all_in_row(lambda q: ((j + q), (i + win_count - 1 - q))))
+            or any(
+                # horizontal lines check                 or vertical lines check
+                (all_in_row(lambda q: ((j + l), (i + q))) or all_in_row(lambda q: ((j + q), (i + l))))
+                for l in range(win_count)
+            )
+            for i in range(self.size + 1 - win_count)
+            for j in range(self.size + 1 - win_count)
+        )
+
+    def bot_choice_func(self, bot_sgn, user_sgn) -> Optional[Choice]:
         if not self:
-            return []
-        for s in [bot_sgn, user_sgn]:  # . 0 1 2
-            for x, y, z in (  # 0 . . .
-                    ((0, 0), (1, 1), (2, 2)),  # 1 . . .
-                    ((0, 2), (1, 1), (2, 0)),  # 2 . . .
-                    *(((i, j) for j in range(3)) for i in range(3)),
-                    *(((j, i) for j in range(3)) for i in range(3))
+            return
+        for s in [bot_sgn, user_sgn]:
+            for positions in (
+                ((0, 0), (1, 1), (2, 2)),  # crosses
+                ((0, 2), (1, 1), (2, 0)),  # then rows and cols
+                *[[(i, j) for j in range(3)] for i in range(3)],
+                *[[(j, i) for j in range(3)] for i in range(3)],
             ):
-                res = self.last_of_three(x, y, z, s)
-                if res:
+                if res := self.last_of_three(s, *map(Choice, positions)):
                     return res
-        # leave this part, please, it just works!
-        for i, j, k, r in (
-                ((0, 1), (1, 0), (1, 2), (0, 2)),
-                ((2, 1), (1, 0), (1, 2), (2, 2)),
-                ((0, 2), (2, 0), (1, 0), (0, 1)),
-                ((0, 0), (2, 2), (1, 2), (0, 1))
+
+        if self.free(center := Choice(1, 1)):
+            return center
+
+        for positions in (
+            ((0, 1), (0, 2), (1, 0)),
+            ((0, 0), (0, 1), (1, 2)),
+            ((1, 0), (2, 1), (2, 2)),
+            ((1, 2), (2, 1), (2, 1)),
         ):
-            if (free(self[r]) and
-                    self[i] == user_sgn and
-                    user_sgn in (self[j], self[k])):
-                return r
-        for i, j, k, l, r in (
-                ((1, 0), (2, 2), (1, 2), (2, 0), (2, 1)),
-                ((0, 1), (2, 0), (0, 0), (2, 1), (1, 0)),
-                ((0, 1), (2, 2), (0, 2), (2, 1), (1, 2)),
-                ((1, 1), (2, 2), (1, 1), (2, 2), (0, 2))
-        ):
-            if free(self[r]) and (
-                    self[i] == self[j] == user_sgn or
-                    self[k] == self[l] == user_sgn
-            ):
-                return r
+            if res := self.last_of_three(s, *map(Choice, positions)):
+                return res
         # last hope :)
         for i in range(3):
             for j in range(3):
-                if free(self[i][j]):
-                    return i, j
+                if self.free(index := Choice(i, j)):
+                    return index
 
-    def game_buttons(self, last_turn, game_sign,
-                     user_language=TGUser().lang):
-        if last_turn:
-            self[last_turn] = new_game_signs[self[last_turn]]
-        last_turn = last_turn or (9, 9)
-        return callback_buttons(
-            tuple(
-                (self[i][j],
-                 game_sign +
-                 str((self[i][j], f'{i}{j}')[self[i][j] == sgn.cell])
-                 )
+    def game_buttons(self, game_type: GameType, language=Language(), turn=None):
+        if turn is None:
+            turn = Choice()
+        else:
+            self.set_inverted_value_for_choice(turn)
+        is_users_game = game_type == GameType.USER
+        game_callback: callback = callback.game if is_users_game else callback.text__game
+
+        return inline_buttons(
+            *(
+                (
+                    item := str(self[i][j]),
+                    game_callback.create(Choice(i, j) if item == CONSTS.EMPTY_CELL else item),
+                )
                 for i in range(self.size)
                 for j in range(self.size)
-            )
-            +
-            (
-                (user_language.do_tie, f'tie{last_turn[0]}{last_turn[1]}'),
-                (user_language.giveup, f'giveup{last_turn[0]}{last_turn[1]}')
-            ) * bool(user_language) * (game_sign != cnst.robot),
-            width=self.size
+            ),
+            is_users_game and (language.do_tie, callback.confirm_end.create(GameEndAction.TIE, turn)),
+            is_users_game and (language.giveup, callback.confirm_end.create(GameEndAction.GIVE_UP, turn)),
+            width=self.size,
         )
 
-    def end_game_buttons(self, current_chat=False):
-        return inline_buttons_(
-            [[
-                 {
-                     'text': sgn.x,
-                     'current_chat': f'x{self.size}'
-                     if current_chat else None,
-                     'another_chat': f'x{self.size}'
-                     if not current_chat else None
-                 },
-                 {
-                     'text': sgn.o,
-                     'current_chat': f'o{self.size}'
-                     if current_chat else None,
-                     'another_chat': f'o{self.size}'
-                     if not current_chat else None
-                 }
-             ] + [[
-                      {
-                          'text': cnst.robot,
-                          'callback': cnst.repeat * 2
-                      },
-                      {
-                          'text': cnst.robot,
-                          'url': 't.me/m0xbot?start=1'
-                      }
-                  ][current_chat]
-                  ]],
-            width=2
+    def end_game_buttons(self, *utm_ref):
+        current_chat = bool(utm_ref)
+        other_chat = not current_chat
+        return inline_buttons(
+            *(
+                {
+                    'text': sign,
+                    'current_chat': current_chat and f'x{self.size}',
+                    'another_chat': other_chat and f'x{self.size}',
+                }
+                for sign in UserSigns
+            ),
+            current_chat
+            and {
+                'text': CONSTS.ROBOT,
+                'url': URLS.ROBOT_START.format(utm_ref='__'.join(('robot',) + utm_ref)),
+            },
+            other_chat and (CONSTS.ROBOT, callback.create(callback.text__reset_start)),
+            width=2,
         )
 
 
 class BoardBig(Board):
+    __slots__ = ('s_value',)
 
-    def __init__(self, _board=''):
-        super().__init__(_board)
-        _board = _board or sgn.cell * 81
-        self.size = s = int(len(_board) ** .25)
-        self.value = \
+    def __init__(self, board: str, size: int = 0):
+        super().__init__('')
+        self.size = size
+        self.value = [
             [
-                [
-                    Board(_board[(i * s + j) * (s * s):(i * s + j + 1) * (s * s)])
-                    for j in range(s)
-                ] for i in range(s)
+                Board.create(board[(row * size + col) * (size * size) : (row * size + col + 1) * (size * size)])
+                for col in range(size)
             ]
-        self.s_value = Board(_board[-s * s:]) \
-            if len(_board) == s ** 4 + s ** 2 else Board()
+            for row in range(size)
+        ]
+        self.s_value = Board.create(board[-size * size :]) if len(board) == size ** 4 + size ** 2 else Board('')
 
-    def __getitem__(self, key):
-        if isinstance(key, tuple):
-            if len(key) == 2:
-                return self.value[key[0]][key[1]]
-            return self.value[key[0]][key[1]][key[2]][key[3]]
-        return Row(self.value[key])
-
-    def __setitem__(self, key, item):
-        if key and isinstance(key, tuple):
-            if len(key) == 2:
-                self.value[key[0]][key[1]] = item
-                return None
-            self.value[key[0]][key[1]][key[2]][key[3]] = item
+    def __getitem__(self, key: RowItem):
+        if isinstance(key, int):
+            return Row(self.value[key])
+        return super().__getitem__(key)
 
     def __repr__(self):
         return join('', self) + str(self.small_value())
+
+    def set_inverted_value_for_choice(self, choice: Optional[Choice]):
+        if choice is not None:
+            super().set_inverted_value_for_choice(choice)
+            Board.create(inverted_game_signs[i] for row in self[choice[2:]] for i in row)
 
     def small_value(self, new=False):
         arr = []
@@ -207,86 +204,62 @@ class BoardBig(Board):
             if not new:
                 return self.s_value
             arr = list(str(self.s_value))
-        arr = arr or [sgn.cell] * self.size ** 2
+        arr = arr or [CONSTS.EMPTY_CELL] * self.size ** 2
         for i in range(self.size):
-            for s in game_signs:
-                if self[i // self.size][i % self.size].winxo(s) and \
-                        arr[i] == sgn.cell:
-                    arr[i] = s
-        return Board(join('', arr))
+            for sign in reversed(UserSigns):
+                if self[i // self.size][i % self.size].check_win_for_sign(sign) and arr[i] == CONSTS.EMPTY_CELL:
+                    arr[i] = sign
+        return Board.create(arr)
 
-    def board_text(self, last_turn=()):
-        if last_turn and last_turn[0] == 9:
+    def board_text(self, last_turn: Optional[Choice] = None):
+        if last_turn and last_turn[0] == CHOICE_NULL:
             last_turn = last_turn[2:] * 2
-        if last_turn:
-            self[last_turn] = new_game_signs[self[last_turn]]
-            self[last_turn[2:]] = Board(''.join([
-                new_game_signs[i]
-                for row in self[last_turn[2:]]
-                for i in row
-            ]))
-        b = '\n\n'.join(
-            ['\n'.join(
-                [join('  ', [self[i][j][k] for j in range(self.size)])
-                 for k in range(self.size)]
-            ) for i in range(self.size)]
-        ) + '\n'
-        if last_turn:
-            self[last_turn] = new_game_signs[self[last_turn]]
-            self[last_turn[2:]] = Board(''.join([
-                new_game_signs[i]
-                for row in self[last_turn[2:]]
-                for i in row
-            ]))
+        self.set_inverted_value_for_choice(last_turn)
+        board = (
+            '\n\n'.join(
+                '\n'.join('  '.join(self[i][j][k] for j in range(self.size)) for k in range(self.size))
+                for i in range(self.size)
+            )
+            + '\n'
+        )
+        self.set_inverted_value_for_choice(last_turn)
         if last_turn:
             last_turn = last_turn[:2]
-        b += '\n' + self.small_value().board_text(last_turn) + '\n'
-        return b
+        board += f'\n{self.small_value().board_text(last_turn)}\n'
+        return board
 
-    def winxo(self, sign):
-        return self.small_value().winxo(sign)
+    def check_win_for_sign(self, sign):
+        return self.small_value().check_win_for_sign(sign)
 
-    def game_buttons(self,
-                     l_t=(),
-                     game_sign=cnst.friend,
-                     user_language=TGUser().lang
-                     ):
-        if l_t:
+    def game_buttons(self, game_sign, user_language=None, l_t=None):
+        if l_t is not None:
             board = self[l_t[2:]]
             if not board or (
-                    len(re.findall(sgn.cell, str(board))) == 1 and
-                    str(board).index(sgn.cell) == l_t[0] * self.size + l_t[1]
+                len(re.findall(CONSTS.EMPTY_CELL, str(board))) == 1
+                and str(board).index(CONSTS.EMPTY_CELL) == l_t[0] * self.size + l_t[1]
             ):
-                l_t = ()
                 board = self.small_value()
+                l_t = Choice()
         else:
             board = self.small_value()
-        l_t = l_t or (9,) * 4
-        markup = callback_buttons(
-            tuple(
-                (board[i][j],
-                 game_sign +
-                 str(cnst.lock if l_t[:2] == (i, j) else
-                     f'{l_t[2]}{l_t[3]}{i}{j}' if
-                     not board or
-                     l_t[2] == 9 or
-                     board[i][j] == sgn.cell else
-                     board[i][j]
-                     ))
+            l_t = Choice()
+        return inline_buttons(
+            *(
+                (
+                    cell := board[i][j],
+                    callback.game.create(
+                        CONSTS.LOCK
+                        if l_t[:2] == [i, j]
+                        else Choice(l_t[2], l_t[3], i, j)
+                        if not board or l_t[2] == CHOICE_NULL or cell == CONSTS.EMPTY_CELL
+                        else cell
+                    ),
+                )
                 for i in range(self.size)
                 for j in range(self.size)
-            )
-            +
-            (
-                (user_language.do_tie,
-                 'tie' + join('', l_t)),
-                (user_language.giveup,
-                 'giveup' + join('', l_t))
-            ) * bool(user_language),
-            width=self.size
+            ),
+            (user_language.do_tie, callback.confirm_end.create(GameEndAction.TIE, l_t)),
+            (user_language.giveup, callback.confirm_end.create(GameEndAction.GIVE_UP, l_t)),
+            {'text': user_language.rules, 'url': URLS.ULTIMATE_TIC_TAC_TOE},
+            width=self.size,
         )
-        markup.add(types.InlineKeyboardButton(
-            user_language.rules,
-            url='https://mathwithbaddrawings.com/2013/06/16/ultimate-tic-tac-toe/'
-        ))
-        return markup

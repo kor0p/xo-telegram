@@ -1,31 +1,57 @@
-from .util import JSON
-from .locales import en, ru, uk
+from __future__ import annotations
+
+import os
+from typing import Any, Iterable
+from importlib import import_module
+from pathlib import Path
+
+
+def get_unique_tuple(value: tuple) -> tuple:
+    return tuple(dict.fromkeys(value))
+
+
+locales_dir = os.listdir(os.path.join(Path(__file__).parent, 'locales'))
+locales_list = [file.split('.', 1)[0] for file in locales_dir if file not in ('__init__.py', '__pycache__')]
 
 
 class Language:
-    language_codes = {'en'}
-    locales = dict(
-        en=en,
-        ru=ru,
-        uk=uk,
-    )
+    NONE: Language
+    language_codes: tuple[str]
+    locales: dict[str, Any] = {locale: import_module(f'bot.locales.{locale}') for locale in locales_list}
 
-    def __init__(self, *languages):
+    def __init__(self, *languages: str, default_codes=('en',)):
         super().__init__()
-        self.language_codes = languages or ('en',)
+        self.language_codes = languages or default_codes
 
-    def __getattr__(self, key):
+    @classmethod
+    def get_localized(cls, key, language_code):
+        return getattr(cls.locales[language_code], key)
+
+    @property
+    def code(self):
+        return self.language_codes[0]
+
+    @classmethod
+    def sum(cls, languages: Iterable[Language]) -> Language:
+        return sum(languages, cls.NONE)
+
+    def __getattr__(self, key: str):
         if key in dir(self):
             return super().__getattribute__(key)
-        return '\n'.join(
-            getattr(self.locales[c], key) for c in self.language_codes
-        )
+        return '\n'.join(self.get_localized(key, c) for c in self.language_codes)
 
-    def __add__(self, other):
-        return Language(*tuple(set(self.language_codes) | set(other.language_codes)))
+    def __add__(self, other: Language) -> Language:
+        return type(self)(*get_unique_tuple((*self.language_codes, *other.language_codes)))
 
     def __repr__(self):
         return str({c: self.locales[c] for c in self.language_codes})
 
     def __len__(self):
-        return 0
+        return len(self.language_codes)
+
+    def __bool__(self):
+        return bool(self.language_codes)
+
+
+# use this for sum
+Language.NONE = Language(default_codes=())
