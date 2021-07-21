@@ -53,10 +53,15 @@ class Base(declarative_base(metadata=metadata), AllFeaturesMixin):
     __abstract__ = True
 
     columns: list[str, ...]
+    primary_keys: list[str, ...]
 
     @classmethod
     def to_obj(cls, **kwargs: Any) -> Base:
         return cls(**kwargs, _without_session=True)
+
+    def get_from_db(self):
+        where = {pk: getattr(self, pk) for pk in self.primary_keys}
+        return self.get(**where)
 
     def __init__(self, _without_session=False, **kwargs: Any):
         super().__init__(**kwargs)
@@ -147,7 +152,7 @@ class Users(Base):
     def add_tg_user(cls, tg_user: TGUser) -> Users:
         user: Users
         user, created = cls.get_or_create(tg_user.id, **tg_user.to_dict())
-        if not created and user.lang != tg_user.lang:
+        if not created and user.lang != tg_user.lang.code:
             return user.update(lang=tg_user.lang.code)
         return user
 

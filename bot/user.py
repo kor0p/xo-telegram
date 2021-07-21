@@ -50,12 +50,7 @@ class TGUser:
             self.username = data.username
             language_code = data.lang
 
-        if not language_code:
-            language_code = 'en'
-        if '-' in language_code:
-            language_code = language_code.split('-')[0]
-
-        self.lang = Language(language_code)
+        self.lang = Language(language_code or 'en')
 
     def to_dict(self):
         return dict(

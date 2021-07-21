@@ -9,7 +9,7 @@ from telebot.types import CallbackQuery, InlineQuery
 
 from ..bot import bot
 from ..button import inline_buttons
-from ..const import CONSTS, URLS, STICKERS, GAME_SIZES, UserSignsNames, SIGNS_TYPE, Choice
+from ..const import CONSTS, URLS, STICKERS, GAME_SIZES, UserSignsNames, SIGNS_TYPE, Choice, GameEndAction
 from ..languages import Language
 from ..game.xo import XO
 from ..utils import random_list_size, callback
@@ -55,6 +55,8 @@ def inline_query_handler(inline_query: InlineQuery):
 @bot.chosen_inline_handler(func=lambda cr: cr)
 def chosen_inline_query(inline_request):
     data = json.loads(inline_request.result_id)
+    if not inline_request.inline_message_id:
+        return  # future message
     XO(inline_request.inline_message_id, new=True).create_base_game(user=inline_request.from_user, **data)
 
 
@@ -65,7 +67,7 @@ def choice_size(cbq: CallbackQuery, size: int):
 
 @bot.callback_query_handler(callback.confirm_end)
 def confirm_or_end(cbq: CallbackQuery, action: str, choice: Choice):
-    error_text = XO(cbq.inline_message_id).confirm_or_end_callback(cbq.from_user, action, choice)
+    error_text = XO(cbq.inline_message_id).confirm_or_end_callback(cbq.from_user, GameEndAction[action], choice)
 
     if error_text:
         return bot.answer_callback_query(cbq.id, error_text, show_alert=True)
@@ -73,7 +75,7 @@ def confirm_or_end(cbq: CallbackQuery, action: str, choice: Choice):
 
 @bot.callback_query_handler(callback.game)
 def main_xo(cbq: CallbackQuery, data: Union[Choice, SIGNS_TYPE, Literal[CONSTS.LOCK]]):
-    callback_text = XO(cbq.inline_message_id).main(cbq.from_user, data)
+    def alert_text(text, **kwargs):
+        return bot.answer_callback_query(cbq.id, text=text, **kwargs)
 
-    if callback_text:
-        return bot.answer_callback_query(cbq.id, callback_text)
+    XO(cbq.inline_message_id).main(cbq.from_user, data, alert_text)

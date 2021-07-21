@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Iterable
+from typing import Any, Union, Iterable, Callable
 from importlib import import_module
 from pathlib import Path
 
 
 def get_unique_tuple(value: tuple) -> tuple:
     return tuple(dict.fromkeys(value))
+
+
+def join(values: Iterable[Union[str, dict]], joiner='\n'):
+    values = list(values)
+    if isinstance(values[0], str):
+        return joiner.join(values)
+
+    return {key: join(v[key] for v in values) for key, value in values[0].items()}
 
 
 locales_dir = os.listdir(os.path.join(Path(__file__).parent, 'locales'))
@@ -18,13 +26,17 @@ class Language:
     NONE: Language
     language_codes: tuple[str]
     locales: dict[str, Any] = {locale: import_module(f'bot.locales.{locale}') for locale in locales_list}
+    _request_lang: Callable = None  # assigned in handlers.__main__
 
     def __init__(self, *languages: str, default_codes=('en',)):
-        super().__init__()
+        languages = tuple((lang.split('-')[0] if '-' in lang else lang) for lang in languages if lang)
         self.language_codes = languages or default_codes
 
     @classmethod
     def get_localized(cls, key, language_code):
+        if language_code not in cls.locales:
+            cls._request_lang(language_code)
+            language_code = 'en'
         return getattr(cls.locales[language_code], key)
 
     @property
@@ -38,7 +50,7 @@ class Language:
     def __getattr__(self, key: str):
         if key in dir(self):
             return super().__getattribute__(key)
-        return '\n'.join(self.get_localized(key, c) for c in self.language_codes)
+        return join(self.get_localized(key, c) for c in self.language_codes)
 
     def __add__(self, other: Language) -> Language:
         return type(self)(*get_unique_tuple((*self.language_codes, *other.language_codes)))

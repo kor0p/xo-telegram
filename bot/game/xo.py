@@ -37,9 +37,6 @@ class XO(Game):
     deleted_at: Optional[datetime] = None
     players: Players
 
-    def __init__(self, _id, new=False):
-        super().__init__(_id, new)
-
     def set(self, obj: DB):
         self._set(**obj.to_dict(nested=True))
 
@@ -47,6 +44,11 @@ class XO(Game):
         self.queue = queue
         self.board = Board.create(board)
         self.deleted_at = deleted_at
+        self.set_players(players_games)
+
+    def set_players(self, players_games: Optional[list[dict, ...]] = None):
+        if players_games is None:
+            players_games = [game.to_dict() for game in db.UsersGames.where(game_id=self.id)]
 
         self.players = Players(
             self.id,
@@ -77,37 +79,53 @@ class XO(Game):
         self.game_xo()
 
     def start_game_with_possible_new_player(self, user: types.User, size: int):
-        new_player = self.players.add_player(TGUser(user))
-        if new_player:
-            self.pass_turn(-1)
+        self.players.add_player(TGUser(user))
 
         if size == 0:
             size = next(random_list_size)
 
         self.timeout((size ** 2) * 30, GameState.GAME)
         self.board = Board.create(size)
-        self.game_xo()
+        self.game_xo(None, False)
 
-    def confirm_or_end_callback(self, user: types.User, action: str, choice: Choice) -> Optional[str]:
+    def confirm_or_end_callback(self, user: types.User, action: GameEndAction, choice: Choice) -> Optional[str]:
         player = TGUser(user)
 
         player_game = self.players.get_game_player(player)
+        if player_game:
+            player_game = player_game.get_from_db()
 
         if action == GameEndAction.CANCEL:
-            if player_game and player_game.action != ActionType.GAME:
-                player_game.update(action=ActionType.GAME)
-                return self.game_xo(choice)
+            if player_game:
+                if player_game.action in (ActionType.GAME, ActionType.TIE) and (
+                    self.players.get_game_actions(ActionType.TIE)
+                ):
+                    db.UsersGames.where(game_id=self.id).update(action=ActionType.GAME)
+                    self.set_players()
+                    return self.game_xo(choice, False)
+                if player_game.action == ActionType.GIVE_UP:
+                    player_game.update(action=ActionType.GAME)
+                    return self.game_xo(choice, False)
+                return player.lang.dont_touch
             return player.lang.stop_game
 
-        if self.players.get_game_actions(ActionType.TIE):
-            if player_game and player_game.action == ActionType.TIE:
-                return self.end(GameState.TIE, choice)
-            return player.lang.stop_game
+        if action == GameEndAction.CONFIRM:
+            if self.players.get_game_actions(ActionType.TIE):
+                if player_game:
+                    if player_game.action == ActionType.GAME:
+                        player_game.update(action=ActionType.TIE)
+                    self.set_players()
+                    # all players now is voted for TIE
+                    if len([game for game in self.players.games if game.action != ActionType.TIE]) == 0:
+                        return self.end(GameState.TIE, choice)
+                    else:
+                        return player.lang.dont_touch
+                return player.lang.stop_game
 
-        if self.players.get_game_actions(ActionType.GIVE_UP):
-            if player_game and player_game.action == ActionType.GIVE_UP:
-                return self.end(GameState.GIVE_UP, choice)
-            return player.lang.stop_game
+            if self.players.get_game_actions(ActionType.GIVE_UP):
+                if player_game and player_game.action == ActionType.GIVE_UP:
+                    return self.end(GameState.GIVE_UP, choice)
+                return player.lang.stop_game
 
         if action == GameEndAction.TIE:
             if player_game:
@@ -120,49 +138,51 @@ class XO(Game):
                 return player.lang.dont_touch
 
             player_game.update(action=ActionType.GIVE_UP)
-            if choice[0] != CHOICE_NULL:  # WTF ??? Why we not updating queue TODO: Check this.
+            if not choice.is_outer():  # WTF ??? Why we not updating queue TODO: Check this.
                 self.pass_turn()  # ############# Can be second turn for player in 4, 9, 16 sizes games
                 self.push()
             return self.timeout_confirm(GameState.GIVE_UP, player, choice)
 
-    def main(self, user: types.User, data: Union[Choice, SIGNS_TYPE, Literal[CONSTS.LOCK]]):
+    def main(self, user: types.User, data: Union[Choice, SIGNS_TYPE, Literal[CONSTS.LOCK]], alert_text):
         player = TGUser(user)
         ul_this = player.lang
         if isinstance(data, str) and (not is_cell_free(data)):
-            return ul_this.dont_touch
-            # return bot.answer_callback_query(query_id, ul_this.dont_touch, show_alert=True)
+            return alert_text(ul_this.dont_touch, show_alert=True)
 
         player_game = self.players.get_game_player(player)
+        if player_game:
+            player_game = player_game.get_from_db()
 
         if player_game and player_game.index != self.queue:
-            return ul_this.stop
+            return alert_text(ul_this.stop)
 
-        if data[:2] == [CHOICE_NULL] * 2:
-            return ul_this.start9
+        if data.x == data.y == CHOICE_NULL:
+            alert_text(ul_this.start9)
 
         for index, sign in enumerate(UserSignsEnum):
             # index is used for calculate queue
 
-            if sign not in self.players and self.queue == index and player_game is None:
-                self.players.add_player_to_db(sign, player, index=index)
-                return ul_this.start_pl_2
+            if sign not in self.players and self.queue != index and player_game is None:
+                self.players.add_player_to_db(sign, player, index)
+                return alert_text(ul_this.start_pl_2)
 
             if sign in self.players:
                 if player_game and player_game.user_sign == sign:
                     if self.queue == player_game.index:
                         return self.game_xo(data)
-                    return ul_this.stop
+                    return alert_text(ul_this.stop)
                 for new_index, new_sign in enumerate(tuple(UserSignsEnum)[index + 1 :]):
                     if new_sign not in self.players:
-                        self.players.add_player_to_db(new_sign, player, index=new_index + 1)
-                        self.game_xo(data)
-                        return ul_this.start_pl_2
+                        user_index = new_index + index + 1
+                        self.players.add_player_to_db(new_sign, player, user_index)
+                        self.game_xo(data, self.queue == user_index)
+                        return alert_text(ul_this.start_pl_2)
                 if player_game and player_game.user_sign == sign and player_game.index == index:
                     return self.game_xo(data)
 
-        return ul_this.stop_game
+        return alert_text(ul_this.stop_game)
 
-    def end(self, game_state: Optional[GameState], index_last_turn=None, text=''):
+    def end(self, game_state: Optional[GameState], index_last_turn: Optional[Choice] = None, text: str = ''):
         ul = self.game_language()
 
         if game_state == GameState.TIE:
@@ -174,13 +194,13 @@ class XO(Game):
                 self.queue = player_game.index
             else:
                 print('WTF?')
-            text += self.build_game_text(self.queue, CONSTS.WIN, CONSTS.LOSE) + ul.player.format(
+            text += self.build_game_text(self.queue, CONSTS.LOSE, CONSTS.WIN) + ul.player.format(
                 (pg := self.players.get_game_actions(ActionType.GIVE_UP)) and pg.user.name
             )
-        elif game_state:
+        elif game_state == GameState.GAME:
             text += self.build_game_text(0, '')
-        if index_last_turn and index_last_turn[0] == CHOICE_NULL:
-            index_last_turn = ()
+        if index_last_turn and index_last_turn.is_outer():
+            index_last_turn = Choice()
         self.edit_message(
             self.board.board_text(index_last_turn) + '\n' + text,
             self.board.end_game_buttons(self.id, str(self.board), '_'.join(str(u.id) for u in self.players)),
@@ -190,44 +210,42 @@ class XO(Game):
         else:
             self.delete()
 
-    def game_xo(self, choice: Optional[Choice] = None):
-        with self.DB.session.no_autoflush:
-            if isinstance(self.board, BoardBig):
-                return self.game_xo_big(choice)
-            ul = self.game_language()
-            if choice:
-                self.board[choice] = win_sign = UserSigns[self.queue]
-                if self.board.check_win_for_sign(win_sign):
-                    return self.end(GameState.END, choice)
-                elif not self.board:
-                    return self.end(GameState.TIE, choice)
-            if any(sign in self.board for sign in UserSigns):
-                self.pass_turn()
-            self.push()
-            self.edit_message(
-                ul.to_win.format(how_many_to_win(self.board.size)) + '\n' + self.build_game_text(self.queue),
-                self.board.game_buttons(GameType.USER, ul, choice),
-            )
-
-    def game_xo_big(self, choice):
+    def game_xo(self, choice: Optional[Choice] = None, make_turn: bool = True):
         ul = self.game_language()
-        last_turn = ()
-        if choice and choice[0] != CHOICE_NULL:
-            last_turn = choice
-            self.board[choice] = UserSigns[self.queue]
-            self.board.s_value = self.board.small_value(True)
-            if self.board.check_win_for_sign(self.board[choice]):
-                return self.end(GameState.END, choice)
-            elif not self.board:
-                return self.end(GameState.TIE, choice)
-        if any(sign in self.board for sign in UserSigns):
-            self.pass_turn()
+        last_turn = Choice()
+
+        is_big_board = isinstance(self.board, BoardBig)
+
+        user_sign = UserSigns[self.queue]
+        if make_turn and choice and not choice.is_outer():
+            self.board[choice] = user_sign
+            if is_big_board:
+                last_turn = choice
+                self.board.s_value = self.board.small_value(True)
+
+        if self.board.check_win_for_sign(user_sign):
+            return self.end(GameState.END, choice)
+        elif not self.board:
+            return self.end(GameState.TIE, choice)
+
+        if not is_big_board:
+            if self.board and make_turn:
+                self.pass_turn()
         elif choice:
-            last_turn = choice[2:] * 2
+            if not self.board:
+                outer_turn = choice.get_outer()
+                last_turn = Choice(*outer_turn, *outer_turn)
+            elif make_turn and not choice.is_outer():
+                self.pass_turn()
+
+        text = ul.to_win.format(how_many_to_win(self.board.size))
+        if is_big_board:
+            text += '\n\n' + self.board.board_text(last_turn)
+
         self.push()
         self.edit_message(
-            self.board.board_text(last_turn) + '\n\n' + self.build_game_text(self.queue),
-            self.board.game_buttons(GameType.USER, ul, choice),
+            text + '\n' + self.build_game_text(self.queue),
+            self.board.game_buttons(GameType.USER, ul, choice if make_turn else None),
         )
 
     def timeout(
@@ -265,7 +283,7 @@ class XO(Game):
             inline_buttons(
                 (
                     user_language.confirm['default'],
-                    callback.confirm_end.create(GameEndAction[game_state.name], last_turn),
+                    callback.confirm_end.create(GameEndAction.CONFIRM, last_turn),
                 ),
                 (game_language.cancel, callback.confirm_end.create(GameEndAction.CANCEL, last_turn)),
             ),

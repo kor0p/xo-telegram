@@ -20,7 +20,7 @@ class Game:
     def __str__(self):
         return ', '.join((f'{name} = {value}' for name, value in self.__dict__.items()))
 
-    def __init__(self, id, new=False):
+    def __init__(self, id, new=False, must_exists_if_not_new=True):
         if id:
             self.id = id
         if existing := self.get():
@@ -28,7 +28,7 @@ class Game:
                 self.delete(existing)
             else:
                 self.set(existing)
-        if new:
+        if new or (must_exists_if_not_new and not existing):
             self.set(self.DB.create(**self.data()))
 
     def get(self) -> DB:
@@ -117,11 +117,13 @@ class Players:
                 return game
 
     def add_player(self, player: TGUser) -> Optional[UsersGames]:
-        for sign in self.possible_signs:
+        for index, sign in enumerate(self.possible_signs):
             if sign not in self and not self.get_game_player(player):
-                return self.add_player_to_db(sign, player, index=len(self))
+                return self.add_player_to_db(sign, player, index=index)
 
-    def add_player_to_db(self, sign: UserSignsEnum, user: TGUser, action=ActionType.GAME, index=0) -> UsersGames:
+    def add_player_to_db(self, sign: UserSignsEnum, user: TGUser, index=None, action=ActionType.GAME) -> UsersGames:
+        if index is None:
+            index = self.possible_signs.index(sign)
         user_game = UsersGames.create(
             game_id=self.game_id,
             user=Users.add_tg_user(user),

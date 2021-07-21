@@ -64,7 +64,7 @@ class Board(Row):
         return Choice()
 
     def set_inverted_value_for_choice(self, choice: Optional[Choice]):
-        if choice is not None:
+        if choice:
             self[choice] = inverted_game_signs[self[choice]]
 
     def board_text(self, last_turn: Optional[Choice] = None):
@@ -138,7 +138,7 @@ class Board(Row):
             *(
                 (
                     item := str(self[i][j]),
-                    game_callback.create(Choice(i, j) if item == CONSTS.EMPTY_CELL else item),
+                    game_callback.create(Choice(i, j) if is_cell_free(item) else item),
                 )
                 for i in range(self.size)
                 for j in range(self.size)
@@ -191,12 +191,16 @@ class BoardBig(Board):
         return super().__getitem__(key)
 
     def __repr__(self):
-        return join('', self) + str(self.small_value())
+        return str(self) + str(self.small_value())
+
+    def __str__(self):
+        return join('', self)
 
     def set_inverted_value_for_choice(self, choice: Optional[Choice]):
-        if choice is not None:
+        if choice:
             super().set_inverted_value_for_choice(choice)
-            Board.create(inverted_game_signs[i] for row in self[choice[2:]] for i in row)
+            outer_choice = choice.get_outer()
+            self[outer_choice] = Board.create(inverted_game_signs[i] for row in self[outer_choice] for i in row)
 
     def small_value(self, new=False):
         arr = []
@@ -204,62 +208,63 @@ class BoardBig(Board):
             if not new:
                 return self.s_value
             arr = list(str(self.s_value))
-        arr = arr or [CONSTS.EMPTY_CELL] * self.size ** 2
-        for i in range(self.size):
+        arr = arr or [CONSTS.EMPTY_CELL] * (self.size ** 2)
+        for i in range(self.size ** 2):
             for sign in reversed(UserSigns):
-                if self[i // self.size][i % self.size].check_win_for_sign(sign) and arr[i] == CONSTS.EMPTY_CELL:
+                if is_cell_free(arr[i]) and self[i // self.size][i % self.size].check_win_for_sign(sign):
                     arr[i] = sign
         return Board.create(arr)
 
     def board_text(self, last_turn: Optional[Choice] = None):
-        if last_turn and last_turn[0] == CHOICE_NULL:
-            last_turn = last_turn[2:] * 2
+        if last_turn and last_turn.is_outer():
+            outer_choice = last_turn.get_outer()
+            last_turn = Choice(*outer_choice, *outer_choice)
         self.set_inverted_value_for_choice(last_turn)
         board = (
             '\n\n'.join(
-                '\n'.join('  '.join(self[i][j][k] for j in range(self.size)) for k in range(self.size))
+                '\n'.join('  '.join(str(self[i][j][k]) for j in range(self.size)) for k in range(self.size))
                 for i in range(self.size)
             )
             + '\n'
         )
         self.set_inverted_value_for_choice(last_turn)
         if last_turn:
-            last_turn = last_turn[:2]
+            last_turn = Choice(last_turn.x, last_turn.y)
         board += f'\n{self.small_value().board_text(last_turn)}\n'
         return board
 
     def check_win_for_sign(self, sign):
         return self.small_value().check_win_for_sign(sign)
 
-    def game_buttons(self, game_sign, user_language=None, l_t=None):
-        if l_t is not None:
-            board = self[l_t[2:]]
+    def game_buttons(self, game_sign, user_language: Language, last_turn: Optional[Choice] = None):
+        if last_turn is not None:
+            board = self[last_turn.get_outer()]
             if not board or (
                 len(re.findall(CONSTS.EMPTY_CELL, str(board))) == 1
-                and str(board).index(CONSTS.EMPTY_CELL) == l_t[0] * self.size + l_t[1]
+                and str(board).index(CONSTS.EMPTY_CELL) == last_turn.x * self.size + last_turn.y
             ):
                 board = self.small_value()
-                l_t = Choice()
+                last_turn = Choice()
         else:
             board = self.small_value()
-            l_t = Choice()
+            last_turn = Choice()
         return inline_buttons(
             *(
                 (
                     cell := board[i][j],
                     callback.game.create(
                         CONSTS.LOCK
-                        if l_t[:2] == [i, j]
-                        else Choice(l_t[2], l_t[3], i, j)
-                        if not board or l_t[2] == CHOICE_NULL or cell == CONSTS.EMPTY_CELL
+                        if (last_turn.x == i and last_turn.y == j)
+                        else Choice(last_turn.a, last_turn.b, i, j)
+                        if not board or last_turn.a == CHOICE_NULL or cell == CONSTS.EMPTY_CELL
                         else cell
                     ),
                 )
                 for i in range(self.size)
                 for j in range(self.size)
             ),
-            (user_language.do_tie, callback.confirm_end.create(GameEndAction.TIE, l_t)),
-            (user_language.giveup, callback.confirm_end.create(GameEndAction.GIVE_UP, l_t)),
+            (user_language.do_tie, callback.confirm_end.create(GameEndAction.TIE, last_turn)),
+            (user_language.giveup, callback.confirm_end.create(GameEndAction.GIVE_UP, last_turn)),
             {'text': user_language.rules, 'url': URLS.ULTIMATE_TIC_TAC_TOE},
             width=self.size,
         )

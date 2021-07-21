@@ -74,7 +74,7 @@ class GameState(Enum):
 class GameEndAction(Enum):
     TIE = 'TIE'
     GIVE_UP = 'GIVE_UP'
-    # CONFIRM = 'CONFIRM'
+    CONFIRM = 'CONFIRM'
     CANCEL = 'CANCEL'
 
 
@@ -120,3 +120,9 @@ class Choice:
 
     def __len__(self):
         return len(tuple(iter(self)))
+
+    def get_outer(self):
+        return Choice(self.a, self.b)
+
+    def is_outer(self):
+        return self.x == CHOICE_NULL
