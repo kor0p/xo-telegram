@@ -14,22 +14,15 @@ from .const import UserSignsEnum, ActionType, CONSTS
 from .user import TGUser
 from .languages import Language
 
-DB_PASSWORD = os.environ['DB_PASSWORD']
-DB_HOST = os.environ.get('DB_HOST', '127.0.0.1')
+DATABASE_URL = os.environ['DATABASE_URL']
+# 'https://europe-west6-xo-bot-215415.cloudfunctions.net/telegram-bot'
+# 'postgresql+pg8000://mngsbeteuhbiyw:add31519f6c894bb8fbcdfd7f81d3e709c35a8c614d96a5b346fc84685099ddb' '@ec2-79-125-64-18.eu-west-1.compute.amazonaws.com:5432/dejl6bj5n0b26c'
 
 engine = sqlalchemy.create_engine(
-    "sqlite:///xo.db",
-    # sqlalchemy.engine.url.URL.create(
-    #     drivername="postgresql+pg8000",
-    #     username='postgres',
-    #     password=DB_PASSWORD,
-    #     database='xo',
-    #     host=DB_HOST,
-    #     port=5432,
-    # ),
-    # pool_size=5,
-    # max_overflow=2,
-    # pool_timeout=30,  # 30 seconds
+    DATABASE_URL,
+    pool_size=5,
+    max_overflow=2,
+    pool_timeout=30,  # 30 seconds
     pool_recycle=1800,  # 30 minutes
     convert_unicode=True,
     # echo=True,  # verbose mode
@@ -38,9 +31,6 @@ engine.dialect.description_encoding = None
 
 
 class CustomQuery(Query):
-    # def first(self):
-    #     return self._iter().first()
-
     def update(self, **where):
         return super().update(where)
 
