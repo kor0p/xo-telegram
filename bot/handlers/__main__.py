@@ -14,5 +14,5 @@ def _request_lang(language):
 Language._request_lang = _request_lang
 
 
-# bot.polling(none_stop=True)
-bot.infinity_polling()
+if __name__ == '__main__':
+    bot.infinity_polling()
