@@ -1,4 +1,4 @@
-from .bot.handlers.__main__ import bot
+from bot.handlers.__main__ import bot
 
 from telebot import types
 

@@ -15,9 +15,6 @@ from .user import TGUser
 from .languages import Language
 
 DATABASE_URL = os.environ['DATABASE_URL']
-# 'https://europe-west6-xo-bot-215415.cloudfunctions.net/telegram-bot'
-# 'postgresql+pg8000://mngsbeteuhbiyw:add31519f6c894bb8fbcdfd7f81d3e709c35a8c614d96a5b346fc84685099ddb' '@ec2-79-125-64-18.eu-west-1.compute.amazonaws.com:5432/dejl6bj5n0b26c'
-
 engine = sqlalchemy.create_engine(
     DATABASE_URL,
     pool_size=5,
