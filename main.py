@@ -24,7 +24,11 @@ class handler(BaseHTTPRequestHandler):
         return
 
 
-httpd = HTTPServer(('', int(os.environ.get('PORT', 80))), handler)
+PORT = int(os.environ.get('PORT'))
+if not PORT or PORT not in (80, 88, 443, 8443):
+    PORT = 8443
+
+httpd = HTTPServer(('', PORT), handler)
 print('Starting httpd...\n')
 sleep(1)
 try:
