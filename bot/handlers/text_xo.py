@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Union
 
+import telebot.apihelper
 from telebot.types import Message, CallbackQuery
 
 from ..bot import bot
@@ -23,7 +24,10 @@ def start_callback(cbq: CallbackQuery):
 @bot.message_handler(commands=['start', 'new', 'game'])
 def pre_start(message: Message):
     user = message.from_user
-    bot.send_message(user.id, Language.get_localized('start', user.language_code), reply_markup=main_menu_buttons())
+    try:
+        bot.send_message(user.id, Language.get_localized('start', user.language_code), reply_markup=main_menu_buttons())
+    except telebot.apihelper.ApiTelegramException as e:
+        telebot.logger.error(e)
 
 
 @bot.message_handler(commands=['request_lang'])

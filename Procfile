@@ -1,1 +1,1 @@
-worker: python -m bot.xo >> output &
+web: python main.py

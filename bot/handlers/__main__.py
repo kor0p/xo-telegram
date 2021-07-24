@@ -1,7 +1,6 @@
 from telebot.types import Message, User
 
 from . import xo, text_xo
-from ..bot import bot
 from ..languages import Language
 
 
@@ -12,7 +11,3 @@ def _request_lang(language):
 
 
 Language._request_lang = _request_lang
-
-
-# bot.polling(none_stop=True)
-bot.infinity_polling()

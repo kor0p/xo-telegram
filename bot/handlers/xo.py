@@ -47,7 +47,7 @@ def inline_query_handler(inline_query: InlineQuery):
                 input_message_content=types.InputTextMessageContent(language.startN),
             )
             for sign in UserSignsNames
-            if not query or sign in query
+            if not query or sign.lower() in query
         ),
     )
 

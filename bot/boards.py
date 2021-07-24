@@ -28,7 +28,7 @@ def is_cell_free(board_cell: str) -> bool:
 
 class Board(Row):
     @classmethod
-    def create(cls, board: Union[str, Iterable, int], size: int = 0) -> Board:
+    def create(cls, board: Union[str, Iterable, int], size: int = 0, used_for_big_board: bool = False) -> Board:
         if isinstance(board, Iterable) and not isinstance(board, str):
             board = ''.join(board)
         if isinstance(board, int):
@@ -40,7 +40,7 @@ class Board(Row):
         if not board:
             board = CONSTS.EMPTY_CELL * (size ** 2)
 
-        if size in BIG_GAME_SIZES:
+        if size in BIG_GAME_SIZES and not used_for_big_board:
             return BoardBig(board, round(size ** 0.5))
         return Board(board, size)
 
@@ -178,12 +178,19 @@ class BoardBig(Board):
         self.size = size
         self.value = [
             [
-                Board.create(board[(row * size + col) * (size * size) : (row * size + col + 1) * (size * size)])
+                Board.create(
+                    board[(row * size + col) * (size ** 2) : (row * size + col + 1) * (size ** 2)],
+                    size=size,
+                    used_for_big_board=True,
+                )
                 for col in range(size)
             ]
             for row in range(size)
         ]
-        self.s_value = Board.create(board[-size * size :]) if len(board) == size ** 4 + size ** 2 else Board('')
+        self.s_value = Board.create(
+            board[-size * size :] if len(board) == size ** 4 + size ** 2 else size,
+            used_for_big_board=True,
+        )
 
     def __getitem__(self, key: RowItem):
         if isinstance(key, int):
@@ -191,7 +198,7 @@ class BoardBig(Board):
         return super().__getitem__(key)
 
     def __repr__(self):
-        return str(self) + str(self.small_value())
+        return repr(self.value) + '\n\n' + repr(self.small_value())
 
     def __str__(self):
         return join('', self)
@@ -200,7 +207,12 @@ class BoardBig(Board):
         if choice:
             super().set_inverted_value_for_choice(choice)
             outer_choice = choice.get_outer()
-            self[outer_choice] = Board.create(inverted_game_signs[i] for row in self[outer_choice] for i in row)
+            r = []
+            for row in self[outer_choice]:
+                for i in row:
+                    r.append(inverted_game_signs[i])
+
+            self[outer_choice] = Board.create(r, used_for_big_board=True)
 
     def small_value(self, new=False):
         arr = []
@@ -208,12 +220,15 @@ class BoardBig(Board):
             if not new:
                 return self.s_value
             arr = list(str(self.s_value))
-        arr = arr or [CONSTS.EMPTY_CELL] * (self.size ** 2)
-        for i in range(self.size ** 2):
-            for sign in reversed(UserSigns):
-                if is_cell_free(arr[i]) and self[i // self.size][i % self.size].check_win_for_sign(sign):
-                    arr[i] = sign
-        return Board.create(arr)
+        if arr:
+            for i in range(self.size ** 2):
+                temp_board = self[i // self.size][i % self.size]
+                for sign in reversed(UserSigns):
+                    if is_cell_free(arr[i]) and temp_board.check_win_for_sign(sign):
+                        arr[i] = sign
+            return Board.create(arr, used_for_big_board=True)
+        else:
+            return Board.create(self.size ** 2, used_for_big_board=True)
 
     def board_text(self, last_turn: Optional[Choice] = None):
         if last_turn and last_turn.is_outer():

@@ -17,12 +17,12 @@ STICKERS = {
 
 def how_many_to_win(size):  # 2 -> 2 | 3,4 -> 3 | 5,6 -> 4 | 7,8 -> 5
     assert size in ALL_AVAILABLE_ACTUAL_GAME_SIZES
-    return round(size * 0.5 + 1.5)
+    return round(size * 0.5 + 1.01)
 
 
 BIG_GAME_SIZES = (4, 9, 16)
 SMALL_GAME_SIZES = (3, 5, 6, 7, 8)
-ALL_AVAILABLE_ACTUAL_GAME_SIZES = (2, *SMALL_GAME_SIZES)
+ALL_AVAILABLE_ACTUAL_GAME_SIZES = (*SMALL_GAME_SIZES, *(s ** 0.5 for s in BIG_GAME_SIZES))
 GAME_SIZES: tuple[int, ...] = (*BIG_GAME_SIZES, *SMALL_GAME_SIZES)
 
 

@@ -3,7 +3,7 @@ import threading
 from datetime import datetime
 from typing import Optional, Union, Literal
 
-from telebot import types
+from telebot import types, logger
 
 from .. import database as db
 from ..boards import is_cell_free, Board, BoardBig
@@ -37,6 +37,17 @@ class XO(Game):
     deleted_at: Optional[datetime] = None
     players: Players
 
+    def __init__(self, id, new=False):
+        self.players = Players(id, [])
+        super().__init__(id, new)
+
+    def delete(self, existing_obj: Optional[DB] = None) -> DB:
+        if existing_obj is None:
+            existing_obj = self.DB.get(id=self.id)
+        if self.push(deleted_at=datetime.now()):
+            logger.debug('Deleted XO')
+        return existing_obj
+
     def set(self, obj: DB):
         self._set(**obj.to_dict(nested=True))
 
@@ -56,7 +67,7 @@ class XO(Game):
         )
 
     def __bool__(self):
-        return super().__bool__() or self.players.get_game_actions(ActionType.TIE, ActionType.GIVE_UP) or False
+        return super().__bool__() or bool(self.players.get_game_actions(ActionType.TIE, ActionType.GIVE_UP))
 
     def pass_turn(self, update: int = 1):
         self.queue = (self.queue + update) % len(self.players.possible_signs)
@@ -162,9 +173,13 @@ class XO(Game):
         for index, sign in enumerate(UserSignsEnum):
             # index is used for calculate queue
 
-            if sign not in self.players and self.queue != index and player_game is None:
+            if sign not in self.players and player_game is None:
                 self.players.add_player_to_db(sign, player, index)
-                return alert_text(ul_this.start_pl_2)
+                alert_text(ul_this.start_pl_2)
+                if self.queue == index:
+                    return self.game_xo(data)
+                else:
+                    return
 
             if sign in self.players:
                 if player_game and player_game.user_sign == sign:
@@ -203,7 +218,7 @@ class XO(Game):
             index_last_turn = Choice()
         self.edit_message(
             self.board.board_text(index_last_turn) + '\n' + text,
-            self.board.end_game_buttons(self.id, str(self.board), '_'.join(str(u.id) for u in self.players)),
+            self.board.end_game_buttons(self.id, '_'.join(str(u.id) for u in self.players)),
         )
         if index_last_turn:
             self.timeout(5, text_for_final_board=text)
