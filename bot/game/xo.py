@@ -67,7 +67,7 @@ class XO(Game):
         )
 
     def __bool__(self):
-        return super().__bool__() or self.players.get_game_actions(ActionType.TIE, ActionType.GIVE_UP) or False
+        return super().__bool__() or bool(self.players.get_game_actions(ActionType.TIE, ActionType.GIVE_UP))
 
     def pass_turn(self, update: int = 1):
         self.queue = (self.queue + update) % len(self.players.possible_signs)
