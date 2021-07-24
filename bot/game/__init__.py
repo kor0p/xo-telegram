@@ -28,7 +28,7 @@ class Game:
                 self.delete(existing)
             else:
                 self.set(existing)
-        if (new or must_exists_if_not_new) and not self.DB.get(id=self.id):
+        if (new or must_exists_if_not_new) and not existing:
             self.set(self.DB.create(**self.data()))
 
     def get(self) -> DB:

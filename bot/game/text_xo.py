@@ -29,6 +29,8 @@ class TextXO(Game):
 
         self.player = tg_user
         super().__init__(tg_user.id, new, False)
+        if not hasattr(self, 'players'):
+            self.set(self.DB.create(**self.data()))
 
     def _set(self, id: int, is_x: bool, board: str, deleted_at: datetime, message_id: int):
         self.is_x = is_x

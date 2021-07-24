@@ -19,6 +19,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         bot.remove_webhook()
+        sleep(5)
         bot.set_webhook(url='https://xo-telegram-bot.herokuapp.com/' + bot.token)
 
         self.send_response(200)
