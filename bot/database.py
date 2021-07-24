@@ -14,7 +14,7 @@ from .const import UserSignsEnum, ActionType, CONSTS
 from .user import TGUser
 from .languages import Language
 
-DATABASE_URL = os.environ['DATABASE_URL']
+DATABASE_URL = os.environ['DB_URL']
 engine = sqlalchemy.create_engine(
     DATABASE_URL,
     pool_size=5,
