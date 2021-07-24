@@ -1,1 +1,1 @@
-worker: python -m bot.xo >> output &
+worker: python -m main >> output.log &
