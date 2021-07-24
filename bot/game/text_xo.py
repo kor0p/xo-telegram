@@ -20,6 +20,7 @@ class TextXO(Game):
     deleted_at: Optional[datetime] = None
     message_id: int = None
     player: TGUser
+    players: Players
 
     def __init__(self, user: User, msg: Message, new=False):
         self.message_id = msg.id
@@ -27,6 +28,7 @@ class TextXO(Game):
         db.Users.add_tg_user(tg_user)
 
         self.player = tg_user
+        self.players = Players('', [])
         super().__init__(tg_user.id, new, False)
 
     def _set(self, id: int, is_x: bool, board: str, deleted_at: datetime, message_id: int):
