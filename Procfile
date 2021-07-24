@@ -1,1 +1,1 @@
-web: python -m main >> output.log &
+web: python main.py
