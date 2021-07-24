@@ -24,7 +24,7 @@ class handler(BaseHTTPRequestHandler):
         return
 
 
-httpd = HTTPServer(('', int(os.environ.get('PORT'))), handler)
+httpd = HTTPServer(('', int(os.environ.get('PORT', 80))), handler)
 print('Starting httpd...\n')
 sleep(1)
 try:
