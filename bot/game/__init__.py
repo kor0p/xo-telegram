@@ -28,7 +28,7 @@ class Game:
                 self.delete(existing)
             else:
                 self.set(existing)
-        if new or (must_exists_if_not_new and not existing):
+        if (new or must_exists_if_not_new) and not self.DB.get(id=self.id):
             self.set(self.DB.create(**self.data()))
 
     def get(self) -> DB:
@@ -124,9 +124,11 @@ class Players:
     def add_player_to_db(self, sign: UserSignsEnum, user: TGUser, index=None, action=ActionType.GAME) -> UsersGames:
         if index is None:
             index = self.possible_signs.index(sign)
-        user_game = UsersGames.create(
-            game_id=self.game_id,
-            user=Users.add_tg_user(user),
+        user_game, _ = UsersGames.get_or_create(
+            dict(
+                game_id=self.game_id,
+                user=Users.add_tg_user(user),
+            ),
             user_sign=sign,
             action=action,
             index=index,

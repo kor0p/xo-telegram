@@ -162,9 +162,8 @@ class Messages(Base):
     @classmethod
     def add_tg_message(cls, message: types.Message):
         user = Users.add_tg_user(TGUser(message.from_user))
-        return cls.create(
-            id=message.id,
-            user=user,
+        return cls.get_or_create(
+            dict(id=message.id, user=user),
             text=message.text,
             content_type=message.content_type,
             data=message.json,

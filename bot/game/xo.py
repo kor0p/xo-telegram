@@ -3,7 +3,7 @@ import threading
 from datetime import datetime
 from typing import Optional, Union, Literal
 
-from telebot import types
+from telebot import types, logger
 
 from .. import database as db
 from ..boards import is_cell_free, Board, BoardBig
@@ -36,6 +36,17 @@ class XO(Game):
     board: Union[Board, BoardBig] = Board.create(3)
     deleted_at: Optional[datetime] = None
     players: Players
+
+    def __init__(self, id, new=False):
+        self.players = Players(id, [])
+        super().__init__(id, new)
+
+    def delete(self, existing_obj: Optional[DB] = None) -> DB:
+        if existing_obj is None:
+            existing_obj = self.DB.get(id=self.id)
+        if self.push(deleted_at=datetime.now()):
+            logger.debug('Deleted XO')
+        return existing_obj
 
     def set(self, obj: DB):
         self._set(**obj.to_dict(nested=True))
@@ -162,9 +173,13 @@ class XO(Game):
         for index, sign in enumerate(UserSignsEnum):
             # index is used for calculate queue
 
-            if sign not in self.players and self.queue != index and player_game is None:
+            if sign not in self.players and player_game is None:
                 self.players.add_player_to_db(sign, player, index)
-                return alert_text(ul_this.start_pl_2)
+                alert_text(ul_this.start_pl_2)
+                if self.queue == index:
+                    return self.game_xo(data)
+                else:
+                    return
 
             if sign in self.players:
                 if player_game and player_game.user_sign == sign:
