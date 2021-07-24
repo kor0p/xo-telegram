@@ -17,7 +17,7 @@ STICKERS = {
 
 def how_many_to_win(size):  # 2 -> 2 | 3,4 -> 3 | 5,6 -> 4 | 7,8 -> 5
     assert size in ALL_AVAILABLE_ACTUAL_GAME_SIZES
-    return round(size * 0.5 + 1.5)
+    return round(size * 0.5 + 1.01)
 
 
 BIG_GAME_SIZES = (4, 9, 16)
