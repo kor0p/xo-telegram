@@ -6,8 +6,9 @@ from datetime import datetime
 from telebot import logger
 
 from ..database import Base, UsersGames, Users
-from ..const import CONSTS, UserSignsEnum, ActionType
+from ..const import CONSTS, UserSignsEnum, UserSignsNames, ActionType
 from ..user import TGUser
+from ..utils import get_markdown_user_url
 
 
 class Game:
@@ -29,10 +30,13 @@ class Game:
             else:
                 self.set(existing)
         if (new or must_exists_if_not_new) and not existing:
-            self.set(self.DB.create(**self.data()))
+            self.set()
 
-    def get(self) -> DB:
-        return self.DB.get(id=self.id, deleted_at=None)
+    def get(self, get_if_deleted=False) -> DB:
+        query = dict(id=self.id, deleted_at=None)
+        if get_if_deleted:
+            del query['deleted_at']
+        return self.DB.get(**query)
 
     def push(self, **data) -> bool:
         if data:
@@ -46,8 +50,10 @@ class Game:
             value.update(**data)
             return True
 
-    def set(self, obj: DB):
-        self._set(**obj.to_dict())
+    def set(self, obj: Optional[DB] = None, nested=False):
+        if obj is None:
+            obj = self.DB.create(**self.data())
+        self._set(**obj.to_dict(nested=nested))
 
     def _set(self, **kwargs: Any) -> None:
         raise NotImplementedError
@@ -75,7 +81,7 @@ class Game:
         extra_sign_other_player: str = '',
     ):
         result = '\n'.join(
-            f'{user_sign.value} {self.players[user_sign]}'
+            f'{user_sign.value} {get_markdown_user_url(self.players[user_sign])}'
             + (extra_sign_player if index == turn_index else extra_sign_other_player)
             for index, user_sign in enumerate(self.players.possible_signs)
         )
@@ -135,6 +141,12 @@ class Players:
         )
         self._append_game(user_game)
         return user_game
+
+    def update_user_game(self, queue: Optional[int] = None, **values):
+        query = dict(game_id=self.game_id)
+        if queue is not None:
+            query['user_sign'] = UserSignsEnum[UserSignsNames[queue]]
+        return UsersGames.where(**query).update(**values)
 
     def __contains__(self, key: UserSignsEnum):
         return key in self.signs_to_users

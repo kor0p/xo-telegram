@@ -28,8 +28,8 @@ engine.dialect.description_encoding = None
 
 
 class CustomQuery(Query):
-    def update(self, **where):
-        return super().update(where)
+    def update(self, **values):
+        return super().update(values)
 
 
 session = scoped_session(sessionmaker(autocommit=True, autoflush=True, bind=engine, query_cls=CustomQuery))
@@ -81,7 +81,7 @@ class Base(declarative_base(metadata=metadata), AllFeaturesMixin):
         if get is None:
             get = {}
         elif not isinstance(get, dict):
-            get = {'id': get}
+            get = dict(id=get)
         if existing_obj := cls.get(**get):
             return existing_obj, False
         return cls.create(**(get | create)), True

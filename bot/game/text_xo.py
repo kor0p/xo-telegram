@@ -30,7 +30,7 @@ class TextXO(Game):
         self.player = tg_user
         super().__init__(tg_user.id, new, False)
         if not hasattr(self, 'players'):
-            self.set(self.DB.create(**self.data()))
+            self.set()
 
     def _set(self, id: int, is_x: bool, board: str, deleted_at: datetime, message_id: int):
         self.is_x = is_x
@@ -61,6 +61,8 @@ class TextXO(Game):
             self.id,
             self.message_id,
             reply_markup=self.board.end_game_buttons() if end else self.board.game_buttons(GameType.ROBOT),
+            parse_mode='Markdown',
+            disable_web_page_preview=True,
         )
 
     def start(self, user_sign: SIGNS_TYPE):

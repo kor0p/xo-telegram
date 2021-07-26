@@ -28,6 +28,8 @@ def resolve_text(queue: Union[bool, int], data: Union[str, Sequence]) -> Sequenc
 
 
 def get_markdown_user_url(user: Union[TGUser, User]) -> str:
+    if user.username:
+        return f'[{user.first_name}](https://t.me/{user.username})'
     return f'[{user.first_name}](tg://user?id={user.id})'
 
 
@@ -48,9 +50,5 @@ class callback(Enum):
     confirm_end = list[GameEndAction, Choice]
 
     def create(self, *data: Union[JSON_COMMON_DATA, Choice, Enum]) -> str:
-        return json.dumps(
-            {'type': self.name}
-            if data is None
-            else {'type': self.name, 'data': [_map_callback_data(row) for row in data]},
-            separators=(',', ':'),
-        )
+        result_data = dict(type=self.name, data=[_map_callback_data(row) for row in data])
+        return json.dumps(result_data, separators=(',', ':'))

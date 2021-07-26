@@ -10,6 +10,7 @@ from .button import inline_buttons
 from .const import (
     CONSTS,
     UserSigns,
+    UserSignsEnum,
     how_many_to_win,
     BIG_GAME_SIZES,
     inverted_game_signs,
@@ -117,6 +118,8 @@ class Board(Row):
             ((0, 0), (0, 1), (1, 2)),
             ((1, 0), (2, 1), (2, 2)),
             ((1, 2), (2, 1), (2, 1)),
+            ((0, 2), (2, 0), (0, 1)),
+            ((0, 0), (2, 2), (0, 1)),
         ):
             if res := self.last_of_three(s, *map(Choice, positions)):
                 return res
@@ -150,22 +153,20 @@ class Board(Row):
 
     def end_game_buttons(self, *utm_ref):
         current_chat = bool(utm_ref)
-        other_chat = not current_chat
         return inline_buttons(
             *(
                 {
-                    'text': sign,
-                    'current_chat': current_chat and f'x{self.size}',
-                    'another_chat': other_chat and f'x{self.size}',
+                    'text': sign.value,
+                    'current_chat' if current_chat else 'another_chat': f'{sign.name}{self.size}',
                 }
-                for sign in UserSigns
+                for sign in UserSignsEnum
             ),
             current_chat
             and {
                 'text': CONSTS.ROBOT,
                 'url': URLS.ROBOT_START.format(utm_ref='__'.join(('robot',) + utm_ref)),
             },
-            other_chat and (CONSTS.ROBOT, callback.create(callback.text__reset_start)),
+            not current_chat and (CONSTS.ROBOT, callback.create(callback.text__reset_start)),
             width=2,
         )
 

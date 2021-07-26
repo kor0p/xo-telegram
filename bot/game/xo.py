@@ -43,13 +43,13 @@ class XO(Game):
 
     def delete(self, existing_obj: Optional[DB] = None) -> DB:
         if existing_obj is None:
-            existing_obj = self.DB.get(id=self.id)
+            existing_obj = self.get(get_if_deleted=True)
         if self.push(deleted_at=datetime.now()):
             logger.debug('Deleted XO')
         return existing_obj
 
-    def set(self, obj: DB):
-        self._set(**obj.to_dict(nested=True))
+    def set(self, obj: Optional[DB] = None):
+        super().set(obj, nested=True)
 
     def _set(self, id: int, queue: int, board: str, deleted_at: datetime, players_games: list[dict, ...]):
         self.queue = queue
@@ -66,14 +66,17 @@ class XO(Game):
             [db.UsersGames.to_obj(**game, user=db.Users.get(id=game['user_id'])) for game in players_games],
         )
 
-    def __bool__(self):
-        return super().__bool__() or bool(self.players.get_game_actions(ActionType.TIE, ActionType.GIVE_UP))
-
     def pass_turn(self, update: int = 1):
         self.queue = (self.queue + update) % len(self.players.possible_signs)
 
-    def edit_message(self, text, reply_markup=None, **kwargs):
-        return bot.edit_message_text(text=text, inline_message_id=self.id, reply_markup=reply_markup, **kwargs)
+    def edit_message(self, text, reply_markup=None):
+        return bot.edit_message_text(
+            text=text,
+            inline_message_id=self.id,
+            reply_markup=reply_markup,
+            parse_mode='Markdown',
+            disable_web_page_preview=True,
+        )
 
     def game_language(self) -> Language:
         return Language.sum(user.lang for user in self.players)
@@ -83,21 +86,21 @@ class XO(Game):
 
         if size == 0:
             self.push()
-            return
-
-        self.timeout((size ** 2) * 30, GameState.GAME)
-        self.board = Board.create(size)
-        self.game_xo()
+        else:
+            self.start_game(size, False)
 
     def start_game_with_possible_new_player(self, user: types.User, size: int):
-        self.players.add_player(TGUser(user))
+        new_player = self.players.add_player(TGUser(user))
 
         if size == 0:
             size = next(random_list_size)
 
+        self.start_game(size, new_player is not None)
+
+    def start_game(self, size: int, make_turn):
         self.timeout((size ** 2) * 30, GameState.GAME)
         self.board = Board.create(size)
-        self.game_xo(None, False)
+        self.game_xo(None, make_turn=make_turn)
 
     def confirm_or_end_callback(self, user: types.User, action: GameEndAction, choice: Choice) -> Optional[str]:
         player = TGUser(user)
@@ -111,7 +114,7 @@ class XO(Game):
                 if player_game.action in (ActionType.GAME, ActionType.TIE) and (
                     self.players.get_game_actions(ActionType.TIE)
                 ):
-                    db.UsersGames.where(game_id=self.id).update(action=ActionType.GAME)
+                    self.players.update_user_game(action=ActionType.GAME)
                     self.set_players()
                     return self.game_xo(choice, False)
                 if player_game.action == ActionType.GIVE_UP:
@@ -150,7 +153,7 @@ class XO(Game):
 
             player_game.update(action=ActionType.GIVE_UP)
             if not choice.is_outer():  # WTF ??? Why we not updating queue TODO: Check this.
-                self.pass_turn()  # ############# Can be second turn for player in 4, 9, 16 sizes games
+                # self.pass_turn()  # ## Can be second turn for player in 4, 9, 16 sizes games
                 self.push()
             return self.timeout_confirm(GameState.GIVE_UP, player, choice)
 
@@ -201,14 +204,18 @@ class XO(Game):
         ul = self.game_language()
 
         if game_state == GameState.TIE:
+            self.players.update_user_game(action=ActionType.END)
             text += self.build_game_text(0, '') + (ul.canceled if self.board else '')
         elif game_state == GameState.END:
+            self.players.update_user_game(queue=self.queue, action=ActionType.END)
             text += self.build_game_text(self.queue, CONSTS.WIN)
         elif game_state == GameState.GIVE_UP:
             if player_game := self.players.get_game_actions(ActionType.GIVE_UP):
                 self.queue = player_game.index
             else:
                 print('WTF?')
+            self.players.update_user_game(action=ActionType.END)
+            self.players.update_user_game(queue=self.queue, action=ActionType.GAME)
             text += self.build_game_text(self.queue, CONSTS.LOSE, CONSTS.WIN) + ul.player.format(
                 (pg := self.players.get_game_actions(ActionType.GIVE_UP)) and pg.user.name
             )
@@ -225,7 +232,7 @@ class XO(Game):
         else:
             self.delete()
 
-    def game_xo(self, choice: Optional[Choice] = None, make_turn: bool = True):
+    def game_xo(self, choice: Optional[Choice], make_turn: bool = True):
         ul = self.game_language()
         last_turn = Choice()
 
@@ -263,24 +270,24 @@ class XO(Game):
             self.board.game_buttons(GameType.USER, ul, choice if make_turn else None),
         )
 
-    def timeout(
+    def timeout(self, *args, **kwargs):
+        threading.Thread(target=self._inner, args=args, kwargs=kwargs, daemon=True).start()
+
+    def _inner(
         self,
         seconds_sleep_time: int,
         game_state: Optional[GameState] = None,
         last_turn: Optional[Choice] = None,
         text_for_final_board: str = CONSTS.TIME,
     ):
-        def __inner():
-            time.sleep(seconds_sleep_time)
-            if (10 <= seconds_sleep_time <= 60) and not self:
-                return
-            if seconds_sleep_time > 10:
-                time.sleep(5)
-            if not self:  # game ended or there is no TIE or GIVE_UP state any more
-                return
-            self.end(game_state, last_turn, text_for_final_board + '\n')
-
-        threading.Thread(target=__inner, daemon=True).start()
+        time.sleep(seconds_sleep_time)
+        if seconds_sleep_time > 10:
+            time.sleep(5)
+        self.set(self.get(get_if_deleted=True))
+        # game ended or there is no TIE or GIVE_UP state any more
+        if not self.players.get_game_actions(ActionType.TIE, ActionType.GIVE_UP):
+            return
+        self.end(game_state, last_turn, text_for_final_board + '\n')
 
     def timeout_confirm(self, game_state: Literal[GameState.TIE, GameState.GIVE_UP], user: TGUser, last_turn: Choice):
         game_language = self.game_language()
@@ -288,6 +295,8 @@ class XO(Game):
         if game_state == GameState.TIE:
             players = [player for player in self.players if player != user]
             user_language = Language.sum(user.lang for user in players)
+            if user_language is Language.NONE:
+                user_language = user.lang
             text = ', '.join(get_markdown_user_url(user) for user in players) + ',\n'
         else:
             user_language = user.lang
@@ -302,6 +311,5 @@ class XO(Game):
                 ),
                 (game_language.cancel, callback.confirm_end.create(GameEndAction.CANCEL, last_turn)),
             ),
-            parse_mode='Markdown',
         )
         self.timeout(30, game_state, last_turn)

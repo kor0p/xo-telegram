@@ -41,7 +41,7 @@ def inline_query_handler(inline_query: InlineQuery):
         inline_query.id,
         (
             types.InlineQueryResultCachedSticker(
-                json.dumps({'size': size, 'sign': sign}),
+                json.dumps(dict(size=size, sign=sign)),
                 STICKERS[sign],
                 reply_markup=buttons,
                 input_message_content=types.InputTextMessageContent(language.startN),

@@ -40,7 +40,7 @@ class INVERTED_SIGNS:
 class CONSTS:
     SUPER_ADMIN_USER_ID = 320063227
     LOCK = 'LOCK'
-    BOT_USERNAME = 'BOT'
+    BOT_USERNAME = 'm0xbot'
     EMPTY_CELL = '⬜'
     TIME = '⏳'
     WIN = '🏆'
@@ -84,9 +84,10 @@ class UserSignsEnum(Enum):
 
 
 class ActionType(Enum):
-    GAME = 0
-    TIE = 1
-    GIVE_UP = 2
+    GAME = 'GAME'
+    TIE = 'TIE'
+    GIVE_UP = 'GIVE_UP'
+    END = 'END'  # WIN or TIE
 
 
 UserSignsNames = tuple(sign.name for sign in UserSignsEnum)
