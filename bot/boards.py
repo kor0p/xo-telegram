@@ -126,6 +126,8 @@ class Board(Row):
         # last hope :)
         for i in range(3):
             for j in range(3):
+                if i == 0 and j == 1:
+                    continue
                 if self.free(index := Choice(i, j)):
                     return index
 
