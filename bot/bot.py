@@ -52,9 +52,9 @@ class ExtraTeleBot(TeleBot):
 
     def send_message(self, user_id, *args, **kwargs) -> types.Message:
         message = super().send_message(user_id, *args, **kwargs)
-        if not message.id:
-            # unsuccessful message - bot is blocked by user
-            Users.get(id=user_id).update(bot_can_message=False)
+        # message.id is None - unsuccessful message - bot is blocked by user
+        Users.get(id=user_id).update(bot_can_message=message.id is not None)
+
         return message
 
 

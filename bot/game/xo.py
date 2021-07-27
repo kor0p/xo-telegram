@@ -74,7 +74,7 @@ class XO(Game):
             text=text,
             inline_message_id=self.id,
             reply_markup=reply_markup,
-            parse_mode='Markdown',
+            parse_mode='MarkdownV2',
             disable_web_page_preview=True,
         )
 

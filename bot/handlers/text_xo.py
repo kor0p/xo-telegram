@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Union
+import json
+from typing import Union, Any
+from functools import wraps
 
 import telebot.apihelper
 from telebot.types import Message, CallbackQuery
@@ -8,10 +10,39 @@ from telebot.types import Message, CallbackQuery
 from ..bot import bot
 from ..button import main_menu_buttons
 from ..const import CONSTS, SIGNS_TYPE, UserSigns, Choice
+from ..database import Users
 from ..languages import Language
 from ..game.text_xo import TextXO
 from ..user import TGUser
 from ..utils import get_markdown_user_url, callback
+
+
+def admin_panel(fn):
+    @wraps(fn)
+    def _command(message):
+        command, text = message.text.split('\n', 1)
+        if ' ' in command:
+            options = dict(option.split('=') for option in command.split(' ')[1:])
+            for option, value in options.items():
+                options[option] = json.loads(value)
+        else:
+            options = {}
+        return fn(message, text, options)
+
+    return _command
+
+
+@bot.message_handler(commands=['admin:send_message'])
+@admin_panel
+def admin_send_message(message: Message, text: str, options: dict[str, Any]):
+    options = {
+        'parse_mode': 'MarkdownV2',
+        'disable_notification': False,
+        'disable_web_page_preview': False,
+    } | options
+
+    for user in Users.where(bot_can_message=True, id=CONSTS.SUPER_ADMIN_USER_ID):
+        bot.send_message(user.id, text, **options)
 
 
 @bot.callback_query_handler(callback.text__reset_start)
@@ -37,7 +68,7 @@ def request_admin_support(message: Message):
         f'''user: {get_markdown_user_url(message.from_user)}
 text: `{message.text}`
 json: `{message.json}`''',
-        parse_mode='Markdown',
+        parse_mode='MarkdownV2',
     )
 
 
