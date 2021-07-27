@@ -13,7 +13,7 @@ def get_unique_tuple(value: tuple) -> tuple:
 def join(values: Iterable[Union[str, dict]], joiner='\n'):
     values = list(values)
     if not values or isinstance(values[0], str):
-        return joiner.join(values).replace('!', r'\!').replace(')', r'\)')
+        return joiner.join(values).replace('!', '\!').replace(')', '\)')
 
     return {key: join(v[key] for v in values) for key, value in values[0].items()}
 
