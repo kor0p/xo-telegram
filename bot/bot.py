@@ -6,7 +6,7 @@ from typing import Union, Callable, Optional
 from telebot import TeleBot, types, logger
 
 from .const import Choice
-from .database import Messages
+from .database import Messages, Users
 from .utils import JSON_COMMON_DATA
 
 logger.setLevel(logging.DEBUG)
@@ -49,6 +49,13 @@ class ExtraTeleBot(TeleBot):
         for message in new_messages:
             Messages.add_tg_message(message)
         super().process_new_messages(new_messages)
+
+    def send_message(self, user_id, *args, **kwargs) -> types.Message:
+        message = super().send_message(user_id, *args, **kwargs)
+        if not message.id:
+            # unsuccessful message - bot is blocked by user
+            Users.get(id=user_id).update(bot_can_message=False)
+        return message
 
 
 bot = ExtraTeleBot(os.environ.get('BOT_TOKEN'), threaded=False)

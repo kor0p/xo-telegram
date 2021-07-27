@@ -128,6 +128,7 @@ class Users(Base):
     username = Column(String)
     lang = Column(String)
     deleted_at = Column(DateTime, default=None)
+    bot_can_message = Column(Boolean, default=True)
 
     users_games = relationship(UsersGames, backref='user')
     xo_text = relationship(TextXO, backref='player')
@@ -178,4 +179,5 @@ for index, language_code in enumerate(Language.locales):
         dict(username=CONSTS.BOT_USERNAME, lang=language_code),
         id=index,
         name=Language.get_localized('bot', language_code),
+        bot_can_message=False,
     )
