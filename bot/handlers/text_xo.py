@@ -41,7 +41,7 @@ def admin_send_message(message: Message, text: str, options: dict[str, Any]):
         'disable_web_page_preview': False,
     } | options
 
-    for user in Users.where(bot_can_message=True, id=CONSTS.SUPER_ADMIN_USER_ID):
+    for user in Users.where(bot_can_message=True):
         bot.send_message(user.id, text, **options)
 
 
