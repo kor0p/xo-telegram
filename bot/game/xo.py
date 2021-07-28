@@ -201,6 +201,7 @@ class XO(Game):
         return alert_text(ul_this.stop_game)
 
     def end(self, game_state: Optional[GameState], index_last_turn: Optional[Choice] = None, text: str = ''):
+        self.push()
         ul = self.game_language()
 
         if game_state == GameState.TIE:
@@ -285,7 +286,7 @@ class XO(Game):
             time.sleep(5)
         self.set(self.get(get_if_deleted=True))
         # game ended or there is no TIE or GIVE_UP state any more
-        if not self.players.get_game_actions(ActionType.TIE, ActionType.GIVE_UP):
+        if game_state and not self.players.get_game_actions(ActionType[game_state.name]):
             return
         self.end(game_state, last_turn, text_for_final_board + '\n')
 
