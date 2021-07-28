@@ -50,6 +50,9 @@ class XO(Game):
 
     def set(self, obj: Optional[DB] = None):
         super().set(obj, nested=True)
+        if isinstance(self.board, BoardBig):
+            self.board.set_small_value()
+            self.push()
 
     def _set(self, id: int, queue: int, board: str, deleted_at: datetime, players_games: list[dict, ...]):
         self.queue = queue
@@ -244,7 +247,8 @@ class XO(Game):
             self.board[choice] = user_sign
             if is_big_board:
                 last_turn = choice
-                self.board.s_value = self.board.small_value(True)
+                self.board.set_small_value()
+                self.push()
 
         if self.board.check_win_for_sign(user_sign):
             return self.end(GameState.END, choice)

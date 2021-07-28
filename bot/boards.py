@@ -190,10 +190,17 @@ class BoardBig(Board):
             ]
             for row in range(size)
         ]
-        self.s_value = Board.create(
-            board[-size * size :] if len(board) == size ** 4 + size ** 2 else size,
-            used_for_big_board=True,
+        self.set_small_value(
+            Board.create(
+                board[-size * size :] if len(board) == size ** 4 + size ** 2 else size,
+                used_for_big_board=True,
+            )
         )
+
+    def set_small_value(self, board: Optional[Board] = None):
+        if board is None:
+            board = self.small_value(True)
+        self.s_value = board
 
     def __getitem__(self, key: RowItem):
         if isinstance(key, int):
@@ -204,7 +211,7 @@ class BoardBig(Board):
         return repr(self.value) + '\n\n' + repr(self.small_value())
 
     def __str__(self):
-        return join('', self)
+        return join('', self) + str(self.small_value())
 
     def set_inverted_value_for_choice(self, choice: Optional[Choice]):
         if choice:
