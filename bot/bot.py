@@ -4,6 +4,7 @@ import logging
 from typing import Union, Callable, Optional
 
 from telebot import TeleBot, types, logger
+from telebot.apihelper import ApiTelegramException
 
 from .const import Choice
 from .database import Messages, Users
@@ -51,9 +52,12 @@ class ExtraTeleBot(TeleBot):
         super().process_new_messages(new_messages)
 
     def send_message(self, user_id, *args, **kwargs) -> types.Message:
-        message = super().send_message(user_id, *args, **kwargs)
-        # message.id is None - unsuccessful message - bot is blocked by user
-        Users.get(id=user_id).update(bot_can_message=message.id is not None)
+        message = None
+        try:
+            message = super().send_message(user_id, *args, **kwargs)
+        except ApiTelegramException:
+            # message.id is None - unsuccessful message - bot is blocked by user
+            Users.get(id=user_id).update(bot_can_message=message is not None and message.id is not None)
 
         return message
 

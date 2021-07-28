@@ -19,7 +19,10 @@ from ..utils import get_markdown_user_url, callback
 
 def admin_panel(fn):
     @wraps(fn)
-    def _command(message):
+    def _command(message: Message):
+        if message.from_user.id != CONSTS.SUPER_ADMIN_USER_ID:
+            return
+
         command, text = message.text.split('\n', 1)
         if ' ' in command:
             options = dict(option.split('=') for option in command.split(' ')[1:])
@@ -41,7 +44,9 @@ def admin_send_message(message: Message, text: str, options: dict[str, Any]):
         'disable_web_page_preview': False,
     } | options
 
-    for user in Users.where(bot_can_message=True):
+    users = list(Users.all())
+    print(users)
+    for user in users:
         bot.send_message(user.id, text, **options)
 
 
