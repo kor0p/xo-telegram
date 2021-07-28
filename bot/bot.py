@@ -8,6 +8,7 @@ from telebot.apihelper import ApiTelegramException
 
 from .const import Choice
 from .database import Messages, Users
+from .languages import Language
 from .utils import JSON_COMMON_DATA
 
 logger.setLevel(logging.DEBUG)
@@ -55,9 +56,14 @@ class ExtraTeleBot(TeleBot):
         message = None
         try:
             message = super().send_message(user_id, *args, **kwargs)
-        except ApiTelegramException:
-            # message.id is None - unsuccessful message - bot is blocked by user
-            Users.get(id=user_id).update(bot_can_message=message is not None and message.id is not None)
+            print(message)
+            Messages.add_tg_message(message, user=Users.get_bot(Language('en')))
+        except ApiTelegramException as e:
+            print(e)
+            pass
+
+        # message.id is None - unsuccessful message - bot is blocked by user
+        Users.get(id=user_id).update(bot_can_message=message is not None and message.id is not None)
 
         return message
 

@@ -161,8 +161,9 @@ class Messages(Base):
     user = relationship(Users, backref='messages')
 
     @classmethod
-    def add_tg_message(cls, message: types.Message):
-        user = Users.add_tg_user(TGUser(message.from_user))
+    def add_tg_message(cls, message: types.Message, *, user=None):
+        if user is None:
+            user = Users.add_tg_user(TGUser(message.from_user))
         return cls.get_or_create(
             dict(id=message.id, user=user),
             text=message.text,
