@@ -36,7 +36,7 @@ class Language:
     def get_localized(cls, key, language_code):
         if language_code not in cls.locales:
             cls._request_lang(language_code)
-            if '-' in language_code and (short_language_code := language_code.split('-')[0]) in cls.locales:
+            if (_lang := language_code.split('-')) and (short_language_code := _lang[0]) in cls.locales:
                 language_code = short_language_code
             else:
                 language_code = 'en'
