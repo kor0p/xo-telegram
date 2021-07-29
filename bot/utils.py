@@ -5,7 +5,7 @@ from typing import Union, Literal, Sequence, Iterator
 
 from telebot.types import User
 
-from .const import GAME_SIZES, CONSTS, Choice, GameEndAction, GameSigns
+from .const import ALL_AVAILABLE_ACTUAL_GAME_SIZES, CONSTS, Choice, GameEndAction, GameSigns
 from .user import TGUser
 
 JSON_COMMON_DATA = Union[list, int, str]
@@ -13,7 +13,11 @@ JSON_COMMON_DATA = Union[list, int, str]
 
 def get_random_list_size() -> Iterator[int]:
     while True:
-        yield random.choice(GAME_SIZES)
+        yield random.choice(ALL_AVAILABLE_ACTUAL_GAME_SIZES)
+
+
+def get_random_players_count(max_players) -> int:
+    return random.randint(2, max(max_players - 1, 2))
 
 
 random_list_size = get_random_list_size()
@@ -41,11 +45,20 @@ def _map_callback_data(row: Union[JSON_COMMON_DATA, Choice, Enum]) -> JSON_COMMO
     return row
 
 
+class ChooseSize(int):
+    pass
+
+
+class ChoosePlayersCount(int):
+    pass
+
+
 class callback(Enum):
     text__reset_start = ''
     text__start = GameSigns
     text__game = Union[Choice, GameSigns]
-    start = int
+    start_size = ChooseSize
+    start_players_count = ChoosePlayersCount
     game = Union[Choice, GameSigns, Literal[CONSTS.LOCK]]
     confirm_end = list[GameEndAction, Choice]
 

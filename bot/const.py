@@ -17,10 +17,14 @@ STICKERS = {
 }
 STICKERS['default'] = STICKERS['❌']
 
-
-def how_many_to_win(size):  # 2 -> 2 | 3,4 -> 3 | 5,6 -> 4 | 7,8 -> 5
-    assert size in ALL_AVAILABLE_ACTUAL_GAME_SIZES
-    return round(size * 0.5 + 1.01)
+HOW_MANY_TO_WIN = {
+    2: {2: 2},
+    3: {2: 3},
+    5: {2: 4, 3: 4},
+    6: {2: 4, 3: 4, 4: 3},
+    7: {2: 5, 3: 4, 4: 4, 5: 3},
+    8: {2: 5, 3: 4, 4: 4, 5: 4, 6: 3},
+}
 
 
 BIG_GAME_SIZES = (4, 9, 16)
@@ -41,7 +45,7 @@ class INVERTED_SIGNS:
 
 
 class CONSTS:
-    ALL_GAMES_SIGNS = '❌⭕✖🔴'
+    ALL_GAMES_SIGNS = '❌⭕🐵🌝✖🔴🙈🌚'
     DEFAULT_GAMES_SIGNS = '❌⭕✖🔴'
     SUPER_ADMIN_USER_ID = 320063227
     LOCK = 'LOCK'
@@ -123,10 +127,12 @@ class GameSigns(list):
     DEFAULT: GameSigns
     inverted_sings: list[str]
 
-    def __init__(self, signs: list[str, ...]):
-        length = len(signs) // 2
+    def __init__(self, signs: list[str, ...], length: int = None):
+        HALF_LENGTH = len(signs) // 2
+        if length is None:
+            length = HALF_LENGTH
         super().__init__(signs[:length])
-        self.inverted_sings = signs[length:]
+        self.inverted_sings = signs[HALF_LENGTH : HALF_LENGTH + length]
 
     def invert(self, sign):
         if sign in self:

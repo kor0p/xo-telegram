@@ -7,7 +7,7 @@ from typing import Optional, Union, Iterable
 from .languages import Language
 from .row import RowItem, Row, join
 from .button import inline_buttons
-from .const import CONSTS, how_many_to_win, BIG_GAME_SIZES, URLS, GameType, GameEndAction, Choice, GameSigns
+from .const import CONSTS, HOW_MANY_TO_WIN, BIG_GAME_SIZES, URLS, GameType, GameEndAction, Choice, GameSigns
 from .utils import callback
 
 
@@ -68,7 +68,7 @@ class Board(Row):
 
     def check_win_for_sign(self, sign):
         """one system for all sizes"""
-        win_count = how_many_to_win(self.size)
+        win_count = HOW_MANY_TO_WIN[self.size][len(self.signs)]
 
         board = self.board_text()  # # check for first N turns:
         if board.count(sign) < win_count:  # if there is less than N count of sign -> no way to have win
@@ -151,7 +151,7 @@ class Board(Row):
             *(
                 {
                     'text': sign,
-                    'current_chat' if current_chat else 'another_chat': f'{sign}{self.size}',
+                    'current_chat' if current_chat else 'another_chat': f'{sign}{self.size} n={len(self.signs)}',
                 }
                 for sign in signs
             ),
@@ -161,7 +161,7 @@ class Board(Row):
                 'url': URLS.ROBOT_START.format(utm_ref='__'.join(('robot',) + utm_ref)),
             },
             not current_chat and (CONSTS.ROBOT, callback.create(callback.text__reset_start)),
-            width=2,
+            width=len(self.signs),
         )
 
 

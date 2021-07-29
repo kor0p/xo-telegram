@@ -20,7 +20,13 @@ def inline_query_handler(inline_query: InlineQuery):
     language = Language(inline_query.from_user.language_code)
 
     size = 0
+    players_count = 0
     if query := inline_query.query.lower():
+        if 'n=' in query and len(query) > (index := query.index('n=')):
+            _data = query[index + 2 : index + 3]
+            if _data.isnumeric() and (_data := int(_data)) > 1:
+                players_count = _data
+
         if 'r' in query:
             size = next(random_list_size)
             query = query.replace('r', '')
@@ -32,8 +38,8 @@ def inline_query_handler(inline_query: InlineQuery):
                     break
 
     buttons = inline_buttons(
-        *((str(i), callback.start.create(i)) for i in GAME_SIZES),
-        (language.random, callback.start.create(0)),
+        *((str(i), callback.start_size.create(i)) for i in GAME_SIZES),
+        (language.random, callback.start_size.create(0)),
         (not size or random.randint(0, 30) == 0) and {'text': language.donate, 'url': URLS.DONATE},
         width=3,
     )
@@ -41,7 +47,7 @@ def inline_query_handler(inline_query: InlineQuery):
         inline_query.id,
         (
             types.InlineQueryResultCachedSticker(
-                json.dumps(dict(size=size, sign=sign)),
+                json.dumps([size, sign, players_count]),
                 STICKERS.get(sign, STICKERS['default']),
                 reply_markup=buttons,
                 input_message_content=types.InputTextMessageContent(language.startN),
@@ -57,12 +63,17 @@ def chosen_inline_query(inline_request):
     data = json.loads(inline_request.result_id)
     if not inline_request.inline_message_id:
         return  # future message
-    XO(inline_request.inline_message_id, new=True).create_base_game(user=inline_request.from_user, **data)
+    XO(inline_request.inline_message_id, new=True).create_base_game(inline_request.from_user, *data)
 
 
-@bot.callback_query_handler(callback.start)
+@bot.callback_query_handler(callback.start_size)
 def choice_size(cbq: CallbackQuery, size: int):
-    XO(cbq.inline_message_id).start_game_with_possible_new_player(cbq.from_user, size)
+    XO(cbq.inline_message_id).start_game_with_size_chosen(cbq.from_user, size)
+
+
+@bot.callback_query_handler(callback.start_players_count)
+def choice_size(cbq: CallbackQuery, players_count: int):
+    XO(cbq.inline_message_id).start_game_with_players_count_chosen(cbq.from_user, players_count)
 
 
 @bot.callback_query_handler(callback.confirm_end)

@@ -8,12 +8,12 @@ from telebot import types, logger
 from .. import database as db
 from ..boards import is_cell_free, Board, BoardBig
 from ..bot import bot
-from ..const import how_many_to_win, CONSTS, GameType, ActionType, GameState, GameEndAction, Choice, GameSigns
+from ..const import HOW_MANY_TO_WIN, CONSTS, GameType, ActionType, GameState, GameEndAction, Choice, GameSigns
 from ..button import inline_buttons
 from ..game import Game, Players
 from ..languages import Language
 from ..user import TGUser
-from ..utils import random_list_size, get_markdown_user_url, callback
+from ..utils import get_random_players_count, random_list_size, get_markdown_user_url, callback
 
 
 class XO(Game):
@@ -64,7 +64,7 @@ class XO(Game):
     def pass_turn(self, update: int = 1):
         self.queue = (self.queue + update) % len(self.signs)
 
-    def edit_message(self, text, reply_markup=None):
+    def edit_message(self, text, reply_markup):
         return bot.edit_message_text(
             text=text,
             inline_message_id=self.id,
@@ -76,26 +76,63 @@ class XO(Game):
     def game_language(self) -> Language:
         return Language.sum(user.lang for user in self.players)
 
-    def create_base_game(self, user: types.User, size: int, sign: str):
+    def create_base_game(self, user: types.User, size: int, sign: str, players_count: int):
         self.players.add_player_to_db(sign, TGUser(user))
+        has_players_count = players_count != 0
 
-        if size == 0:
+        players_count = players_count if has_players_count else 2
+        self.signs = GameSigns(list(CONSTS.ALL_GAMES_SIGNS), players_count)
+        self.push()
+        self.set_players()
+
+        if size == 0 or not has_players_count:
             self.push()
         else:
             self.start_game(size, False)
 
-    def start_game_with_possible_new_player(self, user: types.User, size: int):
+    def start_game_with_size_chosen(self, user: types.User, size: int):
         new_player = self.players.add_player(TGUser(user))
+        game_language = self.game_language()
 
         if size == 0:
             size = next(random_list_size)
 
-        self.start_game(size, new_player is not None)
+        if size <= 3:
+            return self.start_game(size, new_player is not None)
 
-    def start_game(self, size: int, make_turn):
+        self.edit_message(
+            game_language.choose_players_count,
+            inline_buttons(
+                *(
+                    (players_count, callback.start_players_count.create(players_count))
+                    for players_count in range(2, max(size - 1, 2))
+                ),
+                (game_language.random, callback.start_players_count.create(0)),
+            ),
+        )
+
+        self.start_game(size, False, False)
+
+    def start_game_with_players_count_chosen(self, user: types.User, players_count: int):
+        size = self.board.size
+
+        if players_count == 0:
+            players_count = get_random_players_count(size)
+
+        self.signs = GameSigns(list(CONSTS.ALL_GAMES_SIGNS), players_count)
+        self.push()
+        self.set_players()
+        self.players.add_player(TGUser(user))
+
+        return self.start_game(size, False)
+
+    def start_game(self, size: int, make_turn, start_game=True):
         self.timeout((size ** 2) * 30, GameState.GAME)
         self.board = Board.create(self.signs, size)
-        self.game_xo(None, make_turn=make_turn)
+        if start_game:
+            self.game_xo(None, make_turn=make_turn)
+        else:
+            self.push()
 
     def confirm_or_end_callback(self, user: types.User, action: GameEndAction, choice: Choice) -> Optional[str]:
         player = TGUser(user)
@@ -257,7 +294,7 @@ class XO(Game):
             elif make_turn and not choice.is_outer():
                 self.pass_turn()
 
-        text = ul.to_win.format(how_many_to_win(self.board.size))
+        text = ul.to_win.format(HOW_MANY_TO_WIN[self.board.size][len(self.signs)])
         if is_big_board:
             text += '\n\n' + self.board.board_text(last_turn)
 
