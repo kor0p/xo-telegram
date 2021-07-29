@@ -16,7 +16,7 @@ def is_cell_free(board_cell: str) -> bool:
 
 
 class Board(Row):
-    __slots__ = ('signs',)
+    __slots__ = ('signs', 'raw_size')
 
     @classmethod
     def create(
@@ -39,6 +39,7 @@ class Board(Row):
 
     def __init__(self, signs: GameSigns, board: str, size: int = 0):
         self.signs = signs
+        self.raw_size = size
         super().__init__([Row(board[i * size : (i + 1) * size]) for i in range(size)], size)
 
     def __contains__(self, key):
@@ -68,7 +69,7 @@ class Board(Row):
 
     def check_win_for_sign(self, sign):
         """one system for all sizes"""
-        win_count = HOW_MANY_TO_WIN[self.size][len(self.signs)]
+        win_count = HOW_MANY_TO_WIN[self.raw_size][len(self.signs)]
 
         board = self.board_text()  # # check for first N turns:
         if board.count(sign) < win_count:  # if there is less than N count of sign -> no way to have win
@@ -112,14 +113,14 @@ class Board(Row):
             ((1, 2), (2, 1), (2, 1)),
             ((0, 2), (2, 0), (0, 1)),
             ((0, 0), (2, 2), (0, 1)),
+            ((0, 0), (1, 1), (0, 2)),
+            ((0, 2), (1, 1), (2, 0)),
         ):
             if res := self.last_of_three(s, *map(Choice, positions)):
                 return res
         # last hope :)
-        for i in range(3):
-            for j in range(3):
-                if i == 0 and j == 1:
-                    continue
+        for i in range(2, -1, -1):
+            for j in range(2, -1, -1):
                 if self.free(index := Choice(i, j)):
                     return index
 
@@ -171,6 +172,7 @@ class BoardBig(Board):
     def __init__(self, signs: GameSigns, board: str, size: int = 0):
         super().__init__(signs, '')
         self.size = size
+        self.raw_size = size ** 2
         self.value = [
             [
                 Board.create(
@@ -227,6 +229,7 @@ class BoardBig(Board):
         if arr:
             for i in range(self.size ** 2):
                 temp_board = self[i // self.size][i % self.size]
+                temp_board.raw_size = self.raw_size
                 for sign in reversed(self.signs):
                     if is_cell_free(arr[i]) and temp_board.check_win_for_sign(sign):
                         arr[i] = sign
@@ -253,7 +256,9 @@ class BoardBig(Board):
         return board
 
     def check_win_for_sign(self, sign):
-        return self.small_value().check_win_for_sign(sign)
+        board = self.small_value()
+        board.raw_size = self.raw_size
+        return board.check_win_for_sign(sign)
 
     def game_buttons(self, game_sign, user_language: Language, last_turn: Optional[Choice] = None):
         if last_turn is not None:

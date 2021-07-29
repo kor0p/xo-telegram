@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import random
 from typing import Union, Literal
 
@@ -9,61 +8,39 @@ from telebot.types import CallbackQuery, InlineQuery
 
 from ..bot import bot
 from ..button import inline_buttons
-from ..const import CONSTS, URLS, STICKERS, GAME_SIZES, Choice, GameEndAction
+from ..const import CONSTS, URLS, GAME_SIZES, Choice, GameEndAction, GameSigns
 from ..languages import Language
 from ..game.xo import XO
-from ..utils import random_list_size, callback
+from ..utils import callback
 
 
 @bot.inline_handler(lambda q: True)
 def inline_query_handler(inline_query: InlineQuery):
     language = Language(inline_query.from_user.language_code)
-
-    size = 0
-    players_count = 0
-    if query := inline_query.query.lower():
-        if 'n=' in query and len(query) > (index := query.index('n=')):
-            _data = query[index + 2 : index + 3]
-            if _data.isnumeric() and (_data := int(_data)) > 1:
-                players_count = _data
-
-        if 'r' in query:
-            size = next(random_list_size)
-            query = query.replace('r', '')
-        else:
-            for game_size in GAME_SIZES:
-                if (str_size := str(game_size)) in query:
-                    size = game_size
-                    query = query.replace(str_size, '')
-                    break
+    query = inline_query.query
 
     buttons = inline_buttons(
         *((str(i), callback.start_size.create(i)) for i in GAME_SIZES),
         (language.random, callback.start_size.create(0)),
-        (not size or random.randint(0, 30) == 0) and {'text': language.donate, 'url': URLS.DONATE},
+        random.randint(0, 30) == 0 and {'text': language.donate, 'url': URLS.DONATE},
         width=3,
     )
+
     return bot.answer_inline_query(
         inline_query.id,
         (
-            types.InlineQueryResultCachedSticker(
-                json.dumps([size, sign, players_count]),
-                STICKERS.get(sign, STICKERS['default']),
-                reply_markup=buttons,
-                input_message_content=types.InputTextMessageContent(language.startN),
-            )
-            for index, sign in enumerate(CONSTS.ALL_GAMES_SIGNS)
-            if (index == 0 or not query or sign in query) and sign in STICKERS
+            types.InlineQueryResultArticle(sign, sign, types.InputTextMessageContent(language.startN), buttons)
+            for sign in GameSigns(CONSTS.ALL_GAMES_SIGNS)
+            if sign in query or not query
         ),
     )
 
 
 @bot.chosen_inline_handler(func=lambda cr: cr)
 def chosen_inline_query(inline_request):
-    data = json.loads(inline_request.result_id)
     if not inline_request.inline_message_id:
         return  # future message
-    XO(inline_request.inline_message_id, new=True).create_base_game(inline_request.from_user, *data)
+    XO(inline_request.inline_message_id, new=True).create_base_game(inline_request.from_user, inline_request.result_id)
 
 
 @bot.callback_query_handler(callback.start_size)
@@ -72,7 +49,7 @@ def choice_size(cbq: CallbackQuery, size: int):
 
 
 @bot.callback_query_handler(callback.start_players_count)
-def choice_size(cbq: CallbackQuery, players_count: int):
+def choice_players_count(cbq: CallbackQuery, players_count: int):
     XO(cbq.inline_message_id).start_game_with_players_count_chosen(cbq.from_user, players_count)
 
 

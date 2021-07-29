@@ -5,7 +5,7 @@ from typing import Union, Literal, Sequence, Iterator
 
 from telebot.types import User
 
-from .const import ALL_AVAILABLE_ACTUAL_GAME_SIZES, CONSTS, Choice, GameEndAction, GameSigns
+from .const import ALL_AVAILABLE_ACTUAL_GAME_SIZES, HOW_MANY_TO_WIN, CONSTS, Choice, GameEndAction, GameSigns
 from .user import TGUser
 
 JSON_COMMON_DATA = Union[list, int, str]
@@ -16,8 +16,9 @@ def get_random_list_size() -> Iterator[int]:
         yield random.choice(ALL_AVAILABLE_ACTUAL_GAME_SIZES)
 
 
-def get_random_players_count(max_players) -> int:
-    return random.randint(2, max(max_players - 1, 2))
+def get_random_players_count(size) -> int:
+    all_possible_players_counts = HOW_MANY_TO_WIN[size].keys()
+    return random.randint(min(all_possible_players_counts), max(all_possible_players_counts))
 
 
 random_list_size = get_random_list_size()

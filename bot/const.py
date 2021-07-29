@@ -11,19 +11,16 @@ class URLS:
     ULTIMATE_TIC_TAC_TOE = 'https://mathwithbaddrawings.com/2013/06/16/ultimate-tic-tac-toe/'
 
 
-STICKERS = {
-    '❌': 'CAADAgADKQAD-8YTE7geSMCRsyDEAg',  # CAACAgIAAxkBAAECmhhg9eL9L7Vzhn6e1-FT6AOBVQABiFUAAikAA_vGExO4HkjAkbMgxCAE
-    '⭕': 'CAADAgADKAAD-8YTE4byaCljfP--Ag',
-}
-STICKERS['default'] = STICKERS['❌']
-
 HOW_MANY_TO_WIN = {
-    2: {2: 2},
     3: {2: 3},
     5: {2: 4, 3: 4},
     6: {2: 4, 3: 4, 4: 3},
     7: {2: 5, 3: 4, 4: 4, 5: 3},
     8: {2: 5, 3: 4, 4: 4, 5: 4, 6: 3},
+    # big boards
+    4: {2: 2},
+    9: {2: 3, 3: 3},
+    16: {2: 4, 3: 3},
 }
 
 

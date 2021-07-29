@@ -76,19 +76,10 @@ class XO(Game):
     def game_language(self) -> Language:
         return Language.sum(user.lang for user in self.players)
 
-    def create_base_game(self, user: types.User, size: int, sign: str, players_count: int):
+    def create_base_game(self, user: types.User, sign: str):
         self.players.add_player_to_db(sign, TGUser(user))
-        has_players_count = players_count != 0
-
-        players_count = players_count if has_players_count else 2
-        self.signs = GameSigns(list(CONSTS.ALL_GAMES_SIGNS), players_count)
-        self.push()
         self.set_players()
-
-        if size == 0 or not has_players_count:
-            self.push()
-        else:
-            self.start_game(size, False)
+        self.push()
 
     def start_game_with_size_chosen(self, user: types.User, size: int):
         new_player = self.players.add_player(TGUser(user))
@@ -97,7 +88,7 @@ class XO(Game):
         if size == 0:
             size = next(random_list_size)
 
-        if size <= 3:
+        if size <= 4:
             return self.start_game(size, new_player is not None)
 
         self.edit_message(
@@ -105,7 +96,7 @@ class XO(Game):
             inline_buttons(
                 *(
                     (players_count, callback.start_players_count.create(players_count))
-                    for players_count in range(2, max(size - 1, 2))
+                    for players_count in HOW_MANY_TO_WIN[size].keys()
                 ),
                 (game_language.random, callback.start_players_count.create(0)),
             ),
@@ -114,7 +105,7 @@ class XO(Game):
         self.start_game(size, False, False)
 
     def start_game_with_players_count_chosen(self, user: types.User, players_count: int):
-        size = self.board.size
+        size = self.board.raw_size
 
         if players_count == 0:
             players_count = get_random_players_count(size)
@@ -294,7 +285,7 @@ class XO(Game):
             elif make_turn and not choice.is_outer():
                 self.pass_turn()
 
-        text = ul.to_win.format(HOW_MANY_TO_WIN[self.board.size][len(self.signs)])
+        text = ul.to_win.format(HOW_MANY_TO_WIN[self.board.raw_size][len(self.signs)])
         if is_big_board:
             text += '\n\n' + self.board.board_text(last_turn)
 
@@ -320,6 +311,10 @@ class XO(Game):
         self.set(self.get(get_if_deleted=True))
         # game ended or there is no TIE or GIVE_UP state any more
         if game_state and not self.players.get_game_actions(ActionType[game_state.name]):
+            return
+
+        # game inactive timeout
+        if game_state == GameState.GAME and self.deleted_at:
             return
         self.end(game_state, last_turn, text_for_final_board + '\n')
 
