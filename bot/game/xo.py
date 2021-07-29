@@ -8,20 +8,7 @@ from telebot import types, logger
 from .. import database as db
 from ..boards import is_cell_free, Board, BoardBig
 from ..bot import bot
-from ..const import (
-    how_many_to_win,
-    CONSTS,
-    GameType,
-    ActionType,
-    UserSignsEnum,
-    UserSignsNames,
-    UserSigns,
-    GameState,
-    GameEndAction,
-    Choice,
-    SIGNS_TYPE,
-    CHOICE_NULL,
-)
+from ..const import how_many_to_win, CONSTS, GameType, ActionType, GameState, GameEndAction, Choice, GameSigns
 from ..button import inline_buttons
 from ..game import Game, Players
 from ..languages import Language
@@ -32,8 +19,9 @@ from ..utils import random_list_size, get_markdown_user_url, callback
 class XO(Game):
     DB = db.XO
 
+    signs: GameSigns = GameSigns.DEFAULT
     queue: int = 0
-    board: Union[Board, BoardBig] = Board.create(3)
+    board: Union[Board, BoardBig] = Board.create(signs, 3)
     deleted_at: Optional[datetime] = None
     players: Players
 
@@ -54,10 +42,13 @@ class XO(Game):
             self.board.set_small_value()
             self.push()
 
-    def _set(self, id: int, queue: int, board: str, deleted_at: datetime, players_games: list[dict, ...]):
+    def _set(self, id: int, queue: int, board: str, deleted_at: datetime, signs: str, players_games: list[dict, ...]):
+        signs = GameSigns(list(signs))
         self.queue = queue
-        self.board = Board.create(board)
+        self.board = Board.create(signs, board)
         self.deleted_at = deleted_at
+        self.signs = signs
+
         self.set_players(players_games)
 
     def set_players(self, players_games: Optional[list[dict, ...]] = None):
@@ -67,10 +58,11 @@ class XO(Game):
         self.players = Players(
             self.id,
             [db.UsersGames.to_obj(**game, user=db.Users.get(id=game['user_id'])) for game in players_games],
+            self.signs,
         )
 
     def pass_turn(self, update: int = 1):
-        self.queue = (self.queue + update) % len(self.players.possible_signs)
+        self.queue = (self.queue + update) % len(self.signs)
 
     def edit_message(self, text, reply_markup=None):
         return bot.edit_message_text(
@@ -84,8 +76,8 @@ class XO(Game):
     def game_language(self) -> Language:
         return Language.sum(user.lang for user in self.players)
 
-    def create_base_game(self, user: types.User, size: int, sign: UserSignsNames):
-        self.players.add_player_to_db(UserSignsEnum[sign], TGUser(user))
+    def create_base_game(self, user: types.User, size: int, sign: str):
+        self.players.add_player_to_db(sign, TGUser(user))
 
         if size == 0:
             self.push()
@@ -102,7 +94,7 @@ class XO(Game):
 
     def start_game(self, size: int, make_turn):
         self.timeout((size ** 2) * 30, GameState.GAME)
-        self.board = Board.create(size)
+        self.board = Board.create(self.signs, size)
         self.game_xo(None, make_turn=make_turn)
 
     def confirm_or_end_callback(self, user: types.User, action: GameEndAction, choice: Choice) -> Optional[str]:
@@ -160,7 +152,7 @@ class XO(Game):
                 self.push()
             return self.timeout_confirm(GameState.GIVE_UP, player, choice)
 
-    def main(self, user: types.User, data: Union[Choice, SIGNS_TYPE, Literal[CONSTS.LOCK]], alert_text):
+    def main(self, user: types.User, data: Union[Choice, str, Literal[CONSTS.LOCK]], alert_text):
         player = TGUser(user)
         ul_this = player.lang
         if isinstance(data, str) and (not is_cell_free(data)):
@@ -173,10 +165,10 @@ class XO(Game):
         if player_game and player_game.index != self.queue:
             return alert_text(ul_this.stop)
 
-        if data.x == data.y == CHOICE_NULL:
+        if data.is_outer():
             alert_text(ul_this.start9)
 
-        for index, sign in enumerate(UserSignsEnum):
+        for index, sign in enumerate(self.signs):
             # index is used for calculate queue
 
             if sign not in self.players and player_game is None:
@@ -192,7 +184,7 @@ class XO(Game):
                     if self.queue == player_game.index:
                         return self.game_xo(data)
                     return alert_text(ul_this.stop)
-                for new_index, new_sign in enumerate(tuple(UserSignsEnum)[index + 1 :]):
+                for new_index, new_sign in enumerate(tuple(self.signs)[index + 1 :]):
                     if new_sign not in self.players:
                         user_index = new_index + index + 1
                         self.players.add_player_to_db(new_sign, player, user_index)
@@ -229,7 +221,7 @@ class XO(Game):
             index_last_turn = Choice()
         self.edit_message(
             self.board.board_text(index_last_turn) + '\n' + text,
-            self.board.end_game_buttons(self.id, '_'.join(str(u.id) for u in self.players)),
+            self.board.end_game_buttons(self.signs, self.id, '_'.join(str(u.id) for u in self.players)),
         )
         if index_last_turn:
             self.timeout(5, text_for_final_board=text)
@@ -242,7 +234,7 @@ class XO(Game):
 
         is_big_board = isinstance(self.board, BoardBig)
 
-        user_sign = UserSigns[self.queue]
+        user_sign = self.signs[self.queue]
         if make_turn and choice and not choice.is_outer():
             self.board[choice] = user_sign
             if is_big_board:

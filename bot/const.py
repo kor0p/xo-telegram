@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Iterable
+from typing import Iterable
 
 
 class URLS:
@@ -10,9 +12,10 @@ class URLS:
 
 
 STICKERS = {
-    'X': 'CAADAgADKQAD-8YTE7geSMCRsyDEAg',  # CAACAgIAAxkBAAECmhhg9eL9L7Vzhn6e1-FT6AOBVQABiFUAAikAA_vGExO4HkjAkbMgxCAE
-    'O': 'CAADAgADKAAD-8YTE4byaCljfP--Ag',
+    '❌': 'CAADAgADKQAD-8YTE7geSMCRsyDEAg',  # CAACAgIAAxkBAAECmhhg9eL9L7Vzhn6e1-FT6AOBVQABiFUAAikAA_vGExO4HkjAkbMgxCAE
+    '⭕': 'CAADAgADKAAD-8YTE4byaCljfP--Ag',
 }
+STICKERS['default'] = STICKERS['❌']
 
 
 def how_many_to_win(size):  # 2 -> 2 | 3,4 -> 3 | 5,6 -> 4 | 7,8 -> 5
@@ -38,25 +41,18 @@ class INVERTED_SIGNS:
 
 
 class CONSTS:
+    ALL_GAMES_SIGNS = '❌⭕✖🔴'
+    DEFAULT_GAMES_SIGNS = '❌⭕✖🔴'
     SUPER_ADMIN_USER_ID = 320063227
     LOCK = 'LOCK'
     BOT_USERNAME = 'm0xbot'
     EMPTY_CELL = '⬜'
+    INVERTED_EMPTY_CELL = '◻'
     TIME = '⏳'
     WIN = '🏆'
     LOSE = '☠️'
     TURN = ' 👈'
     ROBOT = '🤖'
-
-
-inverted_game_signs = {
-    SIGNS.X: INVERTED_SIGNS.X,
-    SIGNS.O: INVERTED_SIGNS.O,
-    CONSTS.EMPTY_CELL: INVERTED_SIGNS.CELL,
-    INVERTED_SIGNS.X: SIGNS.X,
-    INVERTED_SIGNS.O: SIGNS.O,
-    INVERTED_SIGNS.CELL: CONSTS.EMPTY_CELL,
-}
 
 
 class GameType(Enum):
@@ -78,21 +74,12 @@ class GameEndAction(Enum):
     CANCEL = 'CANCEL'
 
 
-class UserSignsEnum(Enum):
-    X = SIGNS.X
-    O = SIGNS.O
-
-
 class ActionType(Enum):
     GAME = 'GAME'
     TIE = 'TIE'
     GIVE_UP = 'GIVE_UP'
     END = 'END'  # WIN or TIE
 
-
-UserSignsNames = tuple(sign.name for sign in UserSignsEnum)
-UserSigns = tuple(sign.value for sign in UserSignsEnum)
-SIGNS_TYPE = Literal[UserSigns]
 
 CHOICE_NULL = -1
 
@@ -122,8 +109,39 @@ class Choice:
     def __len__(self):
         return len(tuple(iter(self)))
 
+    def is_inner(self):
+        return self.a == CHOICE_NULL
+
     def get_outer(self):
         return Choice(self.a, self.b)
 
     def is_outer(self):
         return self.x == CHOICE_NULL
+
+
+class GameSigns(list):
+    DEFAULT: GameSigns
+    inverted_sings: list[str]
+
+    def __init__(self, signs: list[str, ...]):
+        length = len(signs) // 2
+        super().__init__(signs[:length])
+        self.inverted_sings = signs[length:]
+
+    def invert(self, sign):
+        if sign in self:
+            return self.inverted_sings[self.index(sign)]
+        elif sign in self.inverted_sings:
+            return self[self.inverted_sings.index(sign)]
+        elif sign == CONSTS.EMPTY_CELL:
+            return CONSTS.INVERTED_EMPTY_CELL
+        elif sign == CONSTS.INVERTED_EMPTY_CELL:
+            return CONSTS.EMPTY_CELL
+        else:
+            print('WTF', sign)
+
+    def __str__(self):
+        return ''.join(self) + ''.join(self.inverted_sings)
+
+
+GameSigns.DEFAULT = GameSigns(list(CONSTS.DEFAULT_GAMES_SIGNS))

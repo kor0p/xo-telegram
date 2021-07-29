@@ -2,7 +2,7 @@ from typing import Union, Sequence
 
 from telebot import types
 
-from .const import UserSigns
+from .const import CONSTS
 from .utils import callback
 
 
@@ -32,4 +32,4 @@ def inline_buttons(*buttons: Union[dict, Sequence[str], bool], width=3) -> types
 
 
 def main_menu_buttons(length=2):
-    return inline_buttons(*((sign, callback.text__start.create(sign)) for sign in UserSigns[:length]))
+    return inline_buttons(*((sign, callback.text__start.create(sign)) for sign in CONSTS.DEFAULT_GAMES_SIGNS[:length]))

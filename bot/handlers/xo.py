@@ -9,7 +9,7 @@ from telebot.types import CallbackQuery, InlineQuery
 
 from ..bot import bot
 from ..button import inline_buttons
-from ..const import CONSTS, URLS, STICKERS, GAME_SIZES, UserSignsNames, SIGNS_TYPE, Choice, GameEndAction
+from ..const import CONSTS, URLS, STICKERS, GAME_SIZES, Choice, GameEndAction
 from ..languages import Language
 from ..game.xo import XO
 from ..utils import random_list_size, callback
@@ -42,12 +42,12 @@ def inline_query_handler(inline_query: InlineQuery):
         (
             types.InlineQueryResultCachedSticker(
                 json.dumps(dict(size=size, sign=sign)),
-                STICKERS[sign],
+                STICKERS.get(sign, STICKERS['default']),
                 reply_markup=buttons,
                 input_message_content=types.InputTextMessageContent(language.startN),
             )
-            for sign in UserSignsNames
-            if not query or sign.lower() in query
+            for index, sign in enumerate(CONSTS.ALL_GAMES_SIGNS)
+            if (index == 0 or not query or sign in query) and sign in STICKERS
         ),
     )
 
@@ -74,7 +74,7 @@ def confirm_or_end(cbq: CallbackQuery, action: str, choice: Choice):
 
 
 @bot.callback_query_handler(callback.game)
-def main_xo(cbq: CallbackQuery, data: Union[Choice, SIGNS_TYPE, Literal[CONSTS.LOCK]]):
+def main_xo(cbq: CallbackQuery, data: Union[Choice, str, Literal[CONSTS.LOCK]]):
     def alert_text(text, **kwargs):
         return bot.answer_callback_query(cbq.id, text=text, **kwargs)
 

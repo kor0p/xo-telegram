@@ -10,7 +10,7 @@ from sqlalchemy_mixins import AllFeaturesMixin
 from sqlalchemy_mixins.utils import classproperty
 from telebot import types
 
-from .const import UserSignsEnum, ActionType, CONSTS
+from .const import ActionType, CONSTS
 from .user import TGUser
 from .languages import Language
 
@@ -104,7 +104,7 @@ class UsersGames(Base):
     game_id = Column(String, ForeignKey('xo.id'), primary_key=True)
 
     index = Column(Integer)
-    user_sign = Column(Enum(UserSignsEnum))
+    user_sign = Column(String)
     action = Column(Enum(ActionType))
 
 
@@ -116,6 +116,7 @@ class XO(Base):
     queue = Column(Integer)
     board = Column(String)
     deleted_at = Column(DateTime, default=None)
+    signs = Column(String, default=CONSTS.DEFAULT_GAMES_SIGNS)
 
     players_games = relationship(UsersGames, backref='game')
 
