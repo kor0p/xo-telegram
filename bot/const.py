@@ -30,20 +30,9 @@ ALL_AVAILABLE_ACTUAL_GAME_SIZES = (*SMALL_GAME_SIZES, *(s ** 0.5 for s in BIG_GA
 GAME_SIZES: tuple[int, ...] = (*BIG_GAME_SIZES, *SMALL_GAME_SIZES)
 
 
-class SIGNS:
-    X = '❌'
-    O = '⭕'
-
-
-class INVERTED_SIGNS:
-    CELL = '◻'
-    X = '✖'
-    O = '🔴'
-
-
 class CONSTS:
-    ALL_GAMES_SIGNS = '❌⭕🐵🌝✖🔴🙈🌚'
-    DEFAULT_GAMES_SIGNS = '❌⭕✖🔴'
+    ALL_GAMES_SIGNS = '❌⭕🐵🌝🤓💀' '✖🔴🙈🌚😎👽'
+    DEFAULT_GAMES_SIGNS = '❌⭕' '✖🔴'
     SUPER_ADMIN_USER_ID = 320063227
     LOCK = 'LOCK'
     BOT_USERNAME = 'm0xbot'

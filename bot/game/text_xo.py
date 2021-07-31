@@ -9,7 +9,6 @@ from ..bot import bot
 from ..const import CONSTS, GameType, Choice, GameSigns
 from ..game import Game, Players
 from ..user import TGUser
-from ..utils import resolve_text
 
 
 class TextXO(Game):
@@ -33,6 +32,9 @@ class TextXO(Game):
         if not hasattr(self, 'players'):
             self.set()
 
+    def get(self, **_):
+        return super().get(message_id=self.message_id)
+
     def _set(self, id: int, is_x: bool, board: str, deleted_at: datetime, message_id: int):
         self.is_x = is_x
         self.board = Board.create(self.signs, board)
@@ -41,7 +43,7 @@ class TextXO(Game):
         self.set_players()
 
     def set_players(self):
-        bot_sign, user_sign = resolve_text(self.is_x, self.signs)
+        bot_sign, user_sign = reversed(self.signs) if self.is_x else self.signs
         self.players = Players(
             '',
             [
@@ -61,8 +63,8 @@ class TextXO(Game):
             text,
             self.id,
             self.message_id,
-            reply_markup=(self.board.end_game_buttons(self.signs) if end else self.board.game_buttons(GameType.ROBOT)),
-            parse_mode='MarkdownV2',
+            reply_markup=(self.board.end_game_buttons() if end else self.board.game_buttons(GameType.ROBOT)),
+            parse_mode='HTML',
             disable_web_page_preview=True,
         )
 
@@ -84,7 +86,7 @@ class TextXO(Game):
 
     def main(self, choice: Choice):
         user_language = self.player.lang
-        bot_sign, user_sign = resolve_text(self.is_x, self.signs)
+        bot_sign, user_sign = reversed(self.signs) if self.is_x else self.signs
 
         board = self.board
         board[choice] = user_sign

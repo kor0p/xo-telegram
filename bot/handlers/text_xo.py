@@ -14,7 +14,7 @@ from ..database import Users
 from ..languages import Language
 from ..game.text_xo import TextXO
 from ..user import TGUser
-from ..utils import get_markdown_user_url, callback
+from ..utils import make_html_user_url, callback
 
 
 def admin_panel(fn):
@@ -39,7 +39,7 @@ def admin_panel(fn):
 @admin_panel
 def admin_send_message(message: Message, text: str, options: dict[str, Any]):
     options = {
-        'parse_mode': 'MarkdownV2',
+        'parse_mode': 'HTML',
         'disable_notification': False,
         'disable_web_page_preview': False,
     } | options
@@ -70,10 +70,10 @@ def pre_start(message: Message):
 def request_admin_support(message: Message):
     bot.send_message(
         CONSTS.SUPER_ADMIN_USER_ID,
-        f'''user: {get_markdown_user_url(message.from_user)}
-text: `{message.text}`
-json: `{message.json}`''',
-        parse_mode='MarkdownV2',
+        f'''user: {make_html_user_url(message.from_user)}
+text: <code>{message.text}</code>
+json: <code>{message.json}</code>''',
+        parse_mode='HTML',
     )
 
 

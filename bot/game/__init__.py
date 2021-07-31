@@ -8,7 +8,7 @@ from telebot import logger
 from ..database import Base, UsersGames, Users
 from ..const import CONSTS, ActionType, GameSigns
 from ..user import TGUser
-from ..utils import get_markdown_user_url
+from ..utils import make_html_user_url
 
 
 class Game:
@@ -32,8 +32,8 @@ class Game:
         if (new or must_exists_if_not_new) and not existing:
             self.set()
 
-    def get(self, get_if_deleted=False) -> DB:
-        query = dict(id=self.id, deleted_at=None)
+    def get(self, get_if_deleted=False, **query) -> DB:
+        query = dict(id=self.id, deleted_at=None) | query
         if get_if_deleted:
             del query['deleted_at']
         return self.DB.get(**query)
@@ -81,7 +81,7 @@ class Game:
         extra_sign_other_player: str = '',
     ):
         result = '\n'.join(
-            f'{user_sign} {get_markdown_user_url(self.players[user_sign])}'
+            f'{user_sign} {make_html_user_url(self.players[user_sign])}'
             + (extra_sign_player if index == turn_index else extra_sign_other_player)
             for index, user_sign in enumerate(self.players.possible_signs)
         )

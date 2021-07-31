@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 from itertools import permutations
-from typing import Optional, Union, Iterable
+from functools import partial
+from typing import Optional, Union, Iterable, Callable
 
 from .languages import Language
 from .row import RowItem, Row, join
@@ -67,7 +68,10 @@ class Board(Row):
         self.set_inverted_value_for_choice(last_turn)
         return board
 
-    def check_win_for_sign(self, sign):
+    def all_in_row(self, sign: str, win_count: int, cb: Callable[[int], tuple[int, int]]):
+        return all(self[Choice(cb(q))] == sign for q in range(win_count))
+
+    def check_win_for_sign(self, sign: str):
         """one system for all sizes"""
         win_count = HOW_MANY_TO_WIN[self.raw_size][len(self.signs)]
 
@@ -75,8 +79,7 @@ class Board(Row):
         if board.count(sign) < win_count:  # if there is less than N count of sign -> no way to have win
             return
 
-        def all_in_row(cb):
-            return all(self[Choice(cb(q))] == sign for q in range(win_count))
+        all_in_row = partial(self.all_in_row, sign, win_count)
 
         return any(
             # main diagonal check                     or collateral diagonal check
@@ -146,7 +149,7 @@ class Board(Row):
             width=self.size,
         )
 
-    def end_game_buttons(self, signs: GameSigns, *utm_ref: str):
+    def end_game_buttons(self, *utm_ref: str):
         current_chat = bool(utm_ref)
         return inline_buttons(
             *(
@@ -154,7 +157,7 @@ class Board(Row):
                     'text': sign,
                     'current_chat' if current_chat else 'another_chat': f'{sign}{self.size} n={len(self.signs)}',
                 }
-                for sign in signs
+                for sign in self.signs
             ),
             current_chat
             and {

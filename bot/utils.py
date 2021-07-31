@@ -1,7 +1,7 @@
 import json
 import random
 from enum import Enum
-from typing import Union, Literal, Sequence, Iterator
+from typing import Union, Literal, Iterator
 
 from telebot.types import User
 
@@ -24,18 +24,11 @@ def get_random_players_count(size) -> int:
 random_list_size = get_random_list_size()
 
 
-def resolve_text(queue: Union[bool, int], data: Union[str, Sequence]) -> Sequence:
-    if isinstance(data, str):
-        data = (data, '')
-    if queue:
-        return tuple(reversed(data))
-    return data
-
-
-def get_markdown_user_url(user: Union[TGUser, User]) -> str:
+def make_html_user_url(user: Union[TGUser, User]) -> str:
+    url = f'tg://user?id={user.id}'
     if user.username:
-        return f'[{user.first_name}](https://t.me/{user.username})'
-    return f'[{user.first_name}](tg://user?id={user.id})'
+        url = f'https://t.me/{user.username}'
+    return f'<a href="{url}">{user.first_name}</a>'
 
 
 def _map_callback_data(row: Union[JSON_COMMON_DATA, Choice, Enum]) -> JSON_COMMON_DATA:

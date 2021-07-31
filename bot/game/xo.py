@@ -13,7 +13,7 @@ from ..button import inline_buttons
 from ..game import Game, Players
 from ..languages import Language
 from ..user import TGUser
-from ..utils import get_random_players_count, random_list_size, get_markdown_user_url, callback
+from ..utils import get_random_players_count, random_list_size, make_html_user_url, callback
 
 
 class XO(Game):
@@ -69,7 +69,7 @@ class XO(Game):
             text=text,
             inline_message_id=self.id,
             reply_markup=reply_markup,
-            parse_mode='MarkdownV2',
+            parse_mode='HTML',
             disable_web_page_preview=True,
         )
 
@@ -326,10 +326,10 @@ class XO(Game):
             user_language = Language.sum(user.lang for user in players)
             if user_language is Language.NONE:
                 user_language = user.lang
-            text = ', '.join(get_markdown_user_url(user) for user in players) + ',\n'
+            text = ', '.join(map(make_html_user_url, players)) + ',\n'
         else:
             user_language = user.lang
-            text = get_markdown_user_url(user) + ',\n'
+            text = make_html_user_url(user) + ',\n'
 
         self.edit_message(
             text + user_language.confirm[game_state.name],
