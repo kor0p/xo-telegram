@@ -249,7 +249,7 @@ class XO(Game):
             index_last_turn = Choice()
         self.edit_message(
             self.board.board_text(index_last_turn) + '\n' + text,
-            self.board.end_game_buttons(self.signs, self.id, '_'.join(str(u.id) for u in self.players)),
+            self.board.end_game_buttons(self.id, '_'.join(str(u.id) for u in self.players)),
         )
         if index_last_turn:
             self.timeout(5, text_for_final_board=text)
