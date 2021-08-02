@@ -4,7 +4,7 @@ from typing import Union, Any, Iterable, Optional
 
 from .const import Choice
 
-RowItem = Union[int, Choice]
+RowItem = Union[int, Choice, 'Row']
 
 
 def join(string: str, iterable: Iterable):

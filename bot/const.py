@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Iterable
+from typing import Iterable
 
 
 class URLS:
@@ -9,15 +11,17 @@ class URLS:
     ULTIMATE_TIC_TAC_TOE = 'https://mathwithbaddrawings.com/2013/06/16/ultimate-tic-tac-toe/'
 
 
-STICKERS = {
-    'X': 'CAADAgADKQAD-8YTE7geSMCRsyDEAg',  # CAACAgIAAxkBAAECmhhg9eL9L7Vzhn6e1-FT6AOBVQABiFUAAikAA_vGExO4HkjAkbMgxCAE
-    'O': 'CAADAgADKAAD-8YTE4byaCljfP--Ag',
+HOW_MANY_TO_WIN = {
+    3: {2: 3},
+    5: {2: 4, 3: 4},
+    6: {2: 4, 3: 4, 4: 3},
+    7: {2: 5, 3: 4, 4: 4, 5: 3},
+    8: {2: 5, 3: 4, 4: 4, 5: 4, 6: 3},
+    # big boards
+    4: {2: 2},
+    9: {2: 3, 3: 3},
+    16: {2: 4, 3: 3},
 }
-
-
-def how_many_to_win(size):  # 2 -> 2 | 3,4 -> 3 | 5,6 -> 4 | 7,8 -> 5
-    assert size in ALL_AVAILABLE_ACTUAL_GAME_SIZES
-    return round(size * 0.5 + 1.01)
 
 
 BIG_GAME_SIZES = (4, 9, 16)
@@ -26,37 +30,19 @@ ALL_AVAILABLE_ACTUAL_GAME_SIZES = (*SMALL_GAME_SIZES, *(s ** 0.5 for s in BIG_GA
 GAME_SIZES: tuple[int, ...] = (*BIG_GAME_SIZES, *SMALL_GAME_SIZES)
 
 
-class SIGNS:
-    X = '❌'
-    O = '⭕'
-
-
-class INVERTED_SIGNS:
-    CELL = '◻'
-    X = '✖'
-    O = '🔴'
-
-
 class CONSTS:
+    ALL_GAMES_SIGNS = '❌⭕🐵🌝🤓💀' '✖🔴🙈🌚😎👽'
+    DEFAULT_GAMES_SIGNS = '❌⭕' '✖🔴'
     SUPER_ADMIN_USER_ID = 320063227
     LOCK = 'LOCK'
-    BOT_USERNAME = 'BOT'
+    BOT_USERNAME = 'm0xbot'
     EMPTY_CELL = '⬜'
+    INVERTED_EMPTY_CELL = '◻'
     TIME = '⏳'
     WIN = '🏆'
     LOSE = '☠️'
     TURN = ' 👈'
     ROBOT = '🤖'
-
-
-inverted_game_signs = {
-    SIGNS.X: INVERTED_SIGNS.X,
-    SIGNS.O: INVERTED_SIGNS.O,
-    CONSTS.EMPTY_CELL: INVERTED_SIGNS.CELL,
-    INVERTED_SIGNS.X: SIGNS.X,
-    INVERTED_SIGNS.O: SIGNS.O,
-    INVERTED_SIGNS.CELL: CONSTS.EMPTY_CELL,
-}
 
 
 class GameType(Enum):
@@ -78,20 +64,12 @@ class GameEndAction(Enum):
     CANCEL = 'CANCEL'
 
 
-class UserSignsEnum(Enum):
-    X = SIGNS.X
-    O = SIGNS.O
-
-
 class ActionType(Enum):
-    GAME = 0
-    TIE = 1
-    GIVE_UP = 2
+    GAME = 'GAME'
+    TIE = 'TIE'
+    GIVE_UP = 'GIVE_UP'
+    END = 'END'  # WIN or TIE
 
-
-UserSignsNames = tuple(sign.name for sign in UserSignsEnum)
-UserSigns = tuple(sign.value for sign in UserSignsEnum)
-SIGNS_TYPE = Literal[UserSigns]
 
 CHOICE_NULL = -1
 
@@ -121,8 +99,41 @@ class Choice:
     def __len__(self):
         return len(tuple(iter(self)))
 
+    def is_inner(self):
+        return self.a == CHOICE_NULL
+
     def get_outer(self):
         return Choice(self.a, self.b)
 
     def is_outer(self):
         return self.x == CHOICE_NULL
+
+
+class GameSigns(list):
+    DEFAULT: GameSigns
+    inverted_sings: list[str]
+
+    def __init__(self, signs: list[str, ...], length: int = None):
+        HALF_LENGTH = len(signs) // 2
+        if length is None:
+            length = HALF_LENGTH
+        super().__init__(signs[:length])
+        self.inverted_sings = signs[HALF_LENGTH : HALF_LENGTH + length]
+
+    def invert(self, sign):
+        if sign in self:
+            return self.inverted_sings[self.index(sign)]
+        elif sign in self.inverted_sings:
+            return self[self.inverted_sings.index(sign)]
+        elif sign == CONSTS.EMPTY_CELL:
+            return CONSTS.INVERTED_EMPTY_CELL
+        elif sign == CONSTS.INVERTED_EMPTY_CELL:
+            return CONSTS.EMPTY_CELL
+        else:
+            print('WTF', sign)
+
+    def __str__(self):
+        return ''.join(self) + ''.join(self.inverted_sings)
+
+
+GameSigns.DEFAULT = GameSigns(list(CONSTS.DEFAULT_GAMES_SIGNS))

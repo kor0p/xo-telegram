@@ -10,7 +10,7 @@ from sqlalchemy_mixins import AllFeaturesMixin
 from sqlalchemy_mixins.utils import classproperty
 from telebot import types
 
-from .const import UserSignsEnum, ActionType, CONSTS
+from .const import ActionType, CONSTS
 from .user import TGUser
 from .languages import Language
 
@@ -28,8 +28,8 @@ engine.dialect.description_encoding = None
 
 
 class CustomQuery(Query):
-    def update(self, **where):
-        return super().update(where)
+    def update(self, **values):
+        return super().update(values)
 
 
 session = scoped_session(sessionmaker(autocommit=True, autoflush=True, bind=engine, query_cls=CustomQuery))
@@ -81,7 +81,7 @@ class Base(declarative_base(metadata=metadata), AllFeaturesMixin):
         if get is None:
             get = {}
         elif not isinstance(get, dict):
-            get = {'id': get}
+            get = dict(id=get)
         if existing_obj := cls.get(**get):
             return existing_obj, False
         return cls.create(**(get | create)), True
@@ -104,7 +104,7 @@ class UsersGames(Base):
     game_id = Column(String, ForeignKey('xo.id'), primary_key=True)
 
     index = Column(Integer)
-    user_sign = Column(Enum(UserSignsEnum))
+    user_sign = Column(String)
     action = Column(Enum(ActionType))
 
 
@@ -116,6 +116,7 @@ class XO(Base):
     queue = Column(Integer)
     board = Column(String)
     deleted_at = Column(DateTime, default=None)
+    signs = Column(String, default=CONSTS.DEFAULT_GAMES_SIGNS)
 
     players_games = relationship(UsersGames, backref='game')
 
@@ -128,6 +129,7 @@ class Users(Base):
     username = Column(String)
     lang = Column(String)
     deleted_at = Column(DateTime, default=None)
+    bot_can_message = Column(Boolean, default=True)
 
     users_games = relationship(UsersGames, backref='user')
     xo_text = relationship(TextXO, backref='player')
@@ -160,8 +162,9 @@ class Messages(Base):
     user = relationship(Users, backref='messages')
 
     @classmethod
-    def add_tg_message(cls, message: types.Message):
-        user = Users.add_tg_user(TGUser(message.from_user))
+    def add_tg_message(cls, message: types.Message, *, user=None):
+        if user is None:
+            user = Users.add_tg_user(TGUser(message.from_user))
         return cls.get_or_create(
             dict(id=message.id, user=user),
             text=message.text,
@@ -178,4 +181,5 @@ for index, language_code in enumerate(Language.locales):
         dict(username=CONSTS.BOT_USERNAME, lang=language_code),
         id=index,
         name=Language.get_localized('bot', language_code),
+        bot_can_message=False,
     )

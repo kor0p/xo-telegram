@@ -12,7 +12,7 @@ def get_unique_tuple(value: tuple) -> tuple:
 
 def join(values: Iterable[Union[str, dict]], joiner='\n'):
     values = list(values)
-    if isinstance(values[0], str):
+    if not values or isinstance(values[0], str):
         return joiner.join(values)
 
     return {key: join(v[key] for v in values) for key, value in values[0].items()}
@@ -29,14 +29,19 @@ class Language:
     _request_lang: Callable = None  # assigned in handlers.__main__
 
     def __init__(self, *languages: str, default_codes=('en',)):
-        languages = tuple((lang.split('-')[0] if '-' in lang else lang) for lang in languages if lang)
+        languages = tuple(lang for lang in languages if lang)
         self.language_codes = languages or default_codes
 
     @classmethod
     def get_localized(cls, key, language_code):
+        if language_code is None:
+            language_code = 'en'
         if language_code not in cls.locales:
             cls._request_lang(language_code)
-            language_code = 'en'
+            if (_lang := language_code.split('-')) and (short_language_code := _lang[0]) in cls.locales:
+                language_code = short_language_code
+            else:
+                language_code = 'en'
         return getattr(cls.locales[language_code], key)
 
     @property

@@ -1,11 +1,11 @@
 import json
 import random
 from enum import Enum
-from typing import Union, Literal, Sequence, Iterator
+from typing import Union, Literal, Iterator
 
 from telebot.types import User
 
-from .const import GAME_SIZES, SIGNS_TYPE, CONSTS, Choice, GameEndAction
+from .const import ALL_AVAILABLE_ACTUAL_GAME_SIZES, HOW_MANY_TO_WIN, CONSTS, Choice, GameEndAction, GameSigns
 from .user import TGUser
 
 JSON_COMMON_DATA = Union[list, int, str]
@@ -13,22 +13,22 @@ JSON_COMMON_DATA = Union[list, int, str]
 
 def get_random_list_size() -> Iterator[int]:
     while True:
-        yield random.choice(GAME_SIZES)
+        yield random.choice(ALL_AVAILABLE_ACTUAL_GAME_SIZES)
+
+
+def get_random_players_count(size) -> int:
+    all_possible_players_counts = HOW_MANY_TO_WIN[size].keys()
+    return random.randint(min(all_possible_players_counts), max(all_possible_players_counts))
 
 
 random_list_size = get_random_list_size()
 
 
-def resolve_text(queue: Union[bool, int], data: Union[str, Sequence]) -> Sequence:
-    if isinstance(data, str):
-        data = (data, '')
-    if queue:
-        return tuple(reversed(data))
-    return data
-
-
-def get_markdown_user_url(user: Union[TGUser, User]) -> str:
-    return f'[{user.first_name}](tg://user?id={user.id})'
+def make_html_user_url(user: Union[TGUser, User]) -> str:
+    url = f'tg://user?id={user.id}'
+    if user.username:
+        url = f'https://t.me/{user.username}'
+    return f'<a href="{url}">{user.first_name}</a>'
 
 
 def _map_callback_data(row: Union[JSON_COMMON_DATA, Choice, Enum]) -> JSON_COMMON_DATA:
@@ -39,18 +39,23 @@ def _map_callback_data(row: Union[JSON_COMMON_DATA, Choice, Enum]) -> JSON_COMMO
     return row
 
 
+class ChooseSize(int):
+    pass
+
+
+class ChoosePlayersCount(int):
+    pass
+
+
 class callback(Enum):
     text__reset_start = ''
-    text__start = SIGNS_TYPE
-    text__game = Union[Choice, SIGNS_TYPE]
-    start = int
-    game = Union[Choice, SIGNS_TYPE, Literal[CONSTS.LOCK]]
+    text__start = GameSigns
+    text__game = Union[Choice, GameSigns]
+    start_size = ChooseSize
+    start_players_count = ChoosePlayersCount
+    game = Union[Choice, GameSigns, Literal[CONSTS.LOCK]]
     confirm_end = list[GameEndAction, Choice]
 
     def create(self, *data: Union[JSON_COMMON_DATA, Choice, Enum]) -> str:
-        return json.dumps(
-            {'type': self.name}
-            if data is None
-            else {'type': self.name, 'data': [_map_callback_data(row) for row in data]},
-            separators=(',', ':'),
-        )
+        result_data = dict(type=self.name, data=[_map_callback_data(row) for row in data])
+        return json.dumps(result_data, separators=(',', ':'))

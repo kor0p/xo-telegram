@@ -6,8 +6,9 @@ from datetime import datetime
 from telebot import logger
 
 from ..database import Base, UsersGames, Users
-from ..const import CONSTS, UserSignsEnum, ActionType
+from ..const import CONSTS, ActionType, GameSigns
 from ..user import TGUser
+from ..utils import make_html_user_url
 
 
 class Game:
@@ -29,10 +30,13 @@ class Game:
             else:
                 self.set(existing)
         if (new or must_exists_if_not_new) and not existing:
-            self.set(self.DB.create(**self.data()))
+            self.set()
 
-    def get(self) -> DB:
-        return self.DB.get(id=self.id, deleted_at=None)
+    def get(self, get_if_deleted=False, **query) -> DB:
+        query = dict(id=self.id, deleted_at=None) | query
+        if get_if_deleted:
+            del query['deleted_at']
+        return self.DB.get(**query)
 
     def push(self, **data) -> bool:
         if data:
@@ -46,8 +50,10 @@ class Game:
             value.update(**data)
             return True
 
-    def set(self, obj: DB):
-        self._set(**obj.to_dict())
+    def set(self, obj: Optional[DB] = None, nested=False):
+        if obj is None:
+            obj = self.DB.create(**self.data())
+        self._set(**obj.to_dict(nested=nested))
 
     def _set(self, **kwargs: Any) -> None:
         raise NotImplementedError
@@ -75,7 +81,7 @@ class Game:
         extra_sign_other_player: str = '',
     ):
         result = '\n'.join(
-            f'{user_sign.value} {self.players[user_sign]}'
+            f'{user_sign} {make_html_user_url(self.players[user_sign])}'
             + (extra_sign_player if index == turn_index else extra_sign_other_player)
             for index, user_sign in enumerate(self.players.possible_signs)
         )
@@ -89,14 +95,16 @@ class Players:
         self,
         game_id: str,
         players_games: list[UsersGames, ...],
-        possible_signs: Optional[list[UserSignsEnum, ...]] = None,
+        possible_signs: Optional[GameSigns] = None,
     ):
+        if possible_signs is None:
+            possible_signs = GameSigns.DEFAULT
         self.game_id = game_id
         self.games: list[UsersGames, ...] = players_games
-        self.possible_signs = possible_signs or list(UserSignsEnum)
+        self.possible_signs = possible_signs
 
         self.users: list[TGUser, ...] = []
-        self.signs_to_users: dict[UserSignsEnum, TGUser] = {}
+        self.signs_to_users: dict[str, TGUser] = {}
 
         for game in players_games:
             self._append_game(game)
@@ -106,9 +114,9 @@ class Players:
         self.users.append(user)
         self.signs_to_users[game.user_sign] = user
 
-    def get_game_actions(self, *actions: ActionType) -> Optional[UsersGames]:
+    def get_game_actions(self, action: ActionType) -> Optional[UsersGames]:
         for game in self.games:
-            if game.action in actions:
+            if game.action == action:
                 return game
 
     def get_game_player(self, player: Union[TGUser, Users]) -> Optional[UsersGames]:
@@ -121,7 +129,7 @@ class Players:
             if sign not in self and not self.get_game_player(player):
                 return self.add_player_to_db(sign, player, index=index)
 
-    def add_player_to_db(self, sign: UserSignsEnum, user: TGUser, index=None, action=ActionType.GAME) -> UsersGames:
+    def add_player_to_db(self, sign: str, user: TGUser, index=None, action=ActionType.GAME) -> UsersGames:
         if index is None:
             index = self.possible_signs.index(sign)
         user_game, _ = UsersGames.get_or_create(
@@ -136,10 +144,16 @@ class Players:
         self._append_game(user_game)
         return user_game
 
-    def __contains__(self, key: UserSignsEnum):
+    def update_user_game(self, queue: Optional[int] = None, **values):
+        query = dict(game_id=self.game_id)
+        if queue is not None:
+            query['user_sign'] = self.possible_signs[queue]
+        return UsersGames.where(**query).update(**values)
+
+    def __contains__(self, key: str):
         return key in self.signs_to_users
 
-    def __getitem__(self, key: UserSignsEnum) -> TGUser:
+    def __getitem__(self, key: str) -> TGUser:
         return self.signs_to_users.get(key) or TGUser()
 
     def __iter__(self):

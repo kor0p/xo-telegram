@@ -2,23 +2,13 @@ from __future__ import annotations
 
 import re
 from itertools import permutations
-from typing import Optional, Union, Iterable
+from functools import partial
+from typing import Optional, Union, Iterable, Callable
 
 from .languages import Language
 from .row import RowItem, Row, join
 from .button import inline_buttons
-from .const import (
-    CONSTS,
-    UserSigns,
-    how_many_to_win,
-    BIG_GAME_SIZES,
-    inverted_game_signs,
-    URLS,
-    GameType,
-    GameEndAction,
-    Choice,
-    CHOICE_NULL,
-)
+from .const import CONSTS, HOW_MANY_TO_WIN, BIG_GAME_SIZES, URLS, GameType, GameEndAction, Choice, GameSigns
 from .utils import callback
 
 
@@ -27,8 +17,12 @@ def is_cell_free(board_cell: str) -> bool:
 
 
 class Board(Row):
+    __slots__ = ('signs', 'raw_size')
+
     @classmethod
-    def create(cls, board: Union[str, Iterable, int], size: int = 0, used_for_big_board: bool = False) -> Board:
+    def create(
+        cls, signs: GameSigns, board: Union[str, Iterable, int], size: int = 0, used_for_big_board: bool = False
+    ) -> Board:
         if isinstance(board, Iterable) and not isinstance(board, str):
             board = ''.join(board)
         if isinstance(board, int):
@@ -41,12 +35,13 @@ class Board(Row):
             board = CONSTS.EMPTY_CELL * (size ** 2)
 
         if size in BIG_GAME_SIZES and not used_for_big_board:
-            return BoardBig(board, round(size ** 0.5))
-        return Board(board, size)
+            return BoardBig(signs, board, round(size ** 0.5))
+        return Board(signs, board, size)
 
-    def __init__(self, board: str, size: int = 0):
-        self.size = size
-        self.value = [Row(board[i * size : (i + 1) * size]) for i in range(size)]
+    def __init__(self, signs: GameSigns, board: str, size: int = 0):
+        self.signs = signs
+        self.raw_size = size
+        super().__init__([Row(board[i * size : (i + 1) * size]) for i in range(size)], size)
 
     def __contains__(self, key):
         return key in str(self.value)
@@ -65,7 +60,7 @@ class Board(Row):
 
     def set_inverted_value_for_choice(self, choice: Optional[Choice]):
         if choice:
-            self[choice] = inverted_game_signs[self[choice]]
+            self[choice] = self.signs.invert(self[choice])
 
     def board_text(self, last_turn: Optional[Choice] = None):
         self.set_inverted_value_for_choice(last_turn)
@@ -73,16 +68,18 @@ class Board(Row):
         self.set_inverted_value_for_choice(last_turn)
         return board
 
-    def check_win_for_sign(self, sign):
+    def all_in_row(self, sign: str, win_count: int, cb: Callable[[int], tuple[int, int]]):
+        return all(self[Choice(cb(q))] == sign for q in range(win_count))
+
+    def check_win_for_sign(self, sign: str):
         """one system for all sizes"""
-        win_count = how_many_to_win(self.size)
+        win_count = HOW_MANY_TO_WIN[self.raw_size][len(self.signs)]
 
         board = self.board_text()  # # check for first N turns:
         if board.count(sign) < win_count:  # if there is less than N count of sign -> no way to have win
             return
 
-        def all_in_row(cb):
-            return all(self[Choice(cb(q))] == sign for q in range(win_count))
+        all_in_row = partial(self.all_in_row, sign, win_count)
 
         return any(
             # main diagonal check                     or collateral diagonal check
@@ -117,12 +114,16 @@ class Board(Row):
             ((0, 0), (0, 1), (1, 2)),
             ((1, 0), (2, 1), (2, 2)),
             ((1, 2), (2, 1), (2, 1)),
+            ((0, 2), (2, 0), (0, 1)),
+            ((0, 0), (2, 2), (0, 1)),
+            ((0, 0), (1, 1), (0, 2)),
+            ((0, 2), (1, 1), (2, 0)),
         ):
             if res := self.last_of_three(s, *map(Choice, positions)):
                 return res
         # last hope :)
-        for i in range(3):
-            for j in range(3):
+        for i in range(2, -1, -1):
+            for j in range(2, -1, -1):
                 if self.free(index := Choice(i, j)):
                     return index
 
@@ -148,37 +149,37 @@ class Board(Row):
             width=self.size,
         )
 
-    def end_game_buttons(self, *utm_ref):
+    def end_game_buttons(self, *utm_ref: str):
         current_chat = bool(utm_ref)
-        other_chat = not current_chat
         return inline_buttons(
             *(
                 {
                     'text': sign,
-                    'current_chat': current_chat and f'x{self.size}',
-                    'another_chat': other_chat and f'x{self.size}',
+                    'current_chat' if current_chat else 'another_chat': f'{sign}{self.size} n={len(self.signs)}',
                 }
-                for sign in UserSigns
+                for sign in self.signs
             ),
             current_chat
             and {
                 'text': CONSTS.ROBOT,
                 'url': URLS.ROBOT_START.format(utm_ref='__'.join(('robot',) + utm_ref)),
             },
-            other_chat and (CONSTS.ROBOT, callback.create(callback.text__reset_start)),
-            width=2,
+            not current_chat and (CONSTS.ROBOT, callback.create(callback.text__reset_start)),
+            width=len(self.signs),
         )
 
 
 class BoardBig(Board):
     __slots__ = ('s_value',)
 
-    def __init__(self, board: str, size: int = 0):
-        super().__init__('')
+    def __init__(self, signs: GameSigns, board: str, size: int = 0):
+        super().__init__(signs, '')
         self.size = size
+        self.raw_size = size ** 2
         self.value = [
             [
                 Board.create(
+                    signs,
                     board[(row * size + col) * (size ** 2) : (row * size + col + 1) * (size ** 2)],
                     size=size,
                     used_for_big_board=True,
@@ -187,10 +188,18 @@ class BoardBig(Board):
             ]
             for row in range(size)
         ]
-        self.s_value = Board.create(
-            board[-size * size :] if len(board) == size ** 4 + size ** 2 else size,
-            used_for_big_board=True,
+        self.set_small_value(
+            Board.create(
+                signs,
+                board[-size * size :] if len(board) == size ** 4 + size ** 2 else size,
+                used_for_big_board=True,
+            )
         )
+
+    def set_small_value(self, board: Optional[Board] = None):
+        if board is None:
+            board = self.small_value(True)
+        self.s_value = board
 
     def __getitem__(self, key: RowItem):
         if isinstance(key, int):
@@ -201,7 +210,7 @@ class BoardBig(Board):
         return repr(self.value) + '\n\n' + repr(self.small_value())
 
     def __str__(self):
-        return join('', self)
+        return join('', self) + str(self.small_value())
 
     def set_inverted_value_for_choice(self, choice: Optional[Choice]):
         if choice:
@@ -210,9 +219,9 @@ class BoardBig(Board):
             r = []
             for row in self[outer_choice]:
                 for i in row:
-                    r.append(inverted_game_signs[i])
+                    r.append(self.signs.invert(i))
 
-            self[outer_choice] = Board.create(r, used_for_big_board=True)
+            self[outer_choice] = Board.create(self.signs, r, used_for_big_board=True)
 
     def small_value(self, new=False):
         arr = []
@@ -223,12 +232,13 @@ class BoardBig(Board):
         if arr:
             for i in range(self.size ** 2):
                 temp_board = self[i // self.size][i % self.size]
-                for sign in reversed(UserSigns):
+                temp_board.raw_size = self.raw_size
+                for sign in reversed(self.signs):
                     if is_cell_free(arr[i]) and temp_board.check_win_for_sign(sign):
                         arr[i] = sign
-            return Board.create(arr, used_for_big_board=True)
+            return Board.create(self.signs, arr, used_for_big_board=True)
         else:
-            return Board.create(self.size ** 2, used_for_big_board=True)
+            return Board.create(self.signs, self.size ** 2, used_for_big_board=True)
 
     def board_text(self, last_turn: Optional[Choice] = None):
         if last_turn and last_turn.is_outer():
@@ -249,7 +259,9 @@ class BoardBig(Board):
         return board
 
     def check_win_for_sign(self, sign):
-        return self.small_value().check_win_for_sign(sign)
+        board = self.small_value()
+        board.raw_size = self.raw_size
+        return board.check_win_for_sign(sign)
 
     def game_buttons(self, game_sign, user_language: Language, last_turn: Optional[Choice] = None):
         if last_turn is not None:
@@ -271,7 +283,7 @@ class BoardBig(Board):
                         CONSTS.LOCK
                         if (last_turn.x == i and last_turn.y == j)
                         else Choice(last_turn.a, last_turn.b, i, j)
-                        if not board or last_turn.a == CHOICE_NULL or cell == CONSTS.EMPTY_CELL
+                        if not board or last_turn.is_inner() or cell == CONSTS.EMPTY_CELL
                         else cell
                     ),
                 )

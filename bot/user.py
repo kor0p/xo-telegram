@@ -13,15 +13,17 @@ class DatabaseUsersMockUp:
     name: str
     username: str
     lang: str
+    bot_can_message: bool
 
 
 class TGUser:
-    __slots__ = ('id', 'first_name', 'username', 'lang')
+    __slots__ = ('id', 'first_name', 'username', 'lang', 'bot_can_message')
 
     id: int
     first_name: str
     username: str
     lang: Language
+    bot_can_message: Optional[bool]
 
     def __init__(self, data: Optional[Union[str, dict, types.User, DatabaseUsersMockUp]] = None):
         if not data:
@@ -29,26 +31,28 @@ class TGUser:
             self.first_name = '?'
             self.username = ''
             self.lang = Language()
+            self.bot_can_message = False
             return
 
         if isinstance(data, str):
             data = json.loads(data)
-
-        if isinstance(data, dict):
             self.id = data['id']
             self.first_name = data['first_name']
             self.username = data['username']
             language_code = data['language_code']
+            self.bot_can_message = data['bot_can_message']
         elif isinstance(data, types.User):
             self.id = data.id
             self.first_name = data.first_name
             self.username = data.username
             language_code = data.language_code
+            self.bot_can_message = None
         else:  # database.Users, cannot import due to recursive import
             self.id = data.id
             self.first_name = data.name
             self.username = data.username
             language_code = data.lang
+            self.bot_can_message = data.bot_can_message
 
         self.lang = Language(language_code or 'en')
 
@@ -58,6 +62,7 @@ class TGUser:
             name=self.first_name,
             username=self.username,
             lang=self.lang.code,
+            bot_can_message=self.bot_can_message,
         )
 
     def __repr__(self):
