@@ -18,6 +18,7 @@ start9 = 'It\'s double-turn, keep going!'
 rules = 'Rules'
 donate = 'Donate for project'
 choose_players_count = 'Choose how many players will play'
+exception = 'Server error has occurred'
 confirm = {
     'default': 'Confirm',
     'TIE': 'Accept tie?',
