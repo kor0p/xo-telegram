@@ -34,6 +34,7 @@ class ExtraTeleBot(TeleBot):
 
     def process_new_callback_query(self, messages: list[types.CallbackQuery, ...]):
         for message in messages:
+            self.pending_callback_ids.add(message.id)
             try:
                 data = json.loads(message.data)
                 _type = data['type']
@@ -54,7 +55,9 @@ class ExtraTeleBot(TeleBot):
                         message.id, Language.get_localized('exception', message.from_user.language_code)
                     )
                 except ApiTelegramException:
-                    self.answer_callback_query(message.id)
+                    logger.exception()
+            finally:
+                self.answer_callback_query(message.id)
 
     def answer_callback_query(
         self,

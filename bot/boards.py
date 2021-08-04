@@ -68,7 +68,7 @@ class Board(Row):
         self.set_inverted_value_for_choice(last_turn)
         return board
 
-    def all_in_row(self, sign: str, win_count: int, cb: Callable[[int], tuple[int, int]]):
+    def all_in_row(self, sign: str, win_count: int, cb: Callable[[int], ...]):
         return all(self[Choice(cb(q))] == sign for q in range(win_count))
 
     def check_win_for_sign(self, sign: str):
