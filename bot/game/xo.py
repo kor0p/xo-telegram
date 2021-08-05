@@ -77,7 +77,7 @@ class XO(Game):
         return Language.sum(user.lang for user in self.players)
 
     def create_base_game(self, user: types.User, sign: str):
-        self.players.add_player_to_db(sign, TGUser(user))
+        self.players.add_player_to_db(sign, TGUser(user), force_sign=True)
         self.set_players()
         self.push()
 
@@ -110,7 +110,7 @@ class XO(Game):
         if players_count == 0:
             players_count = get_random_players_count(size)
 
-        self.signs = GameSigns(list(CONSTS.ALL_GAMES_SIGNS), players_count)
+        self.signs = GameSigns(length=players_count)
         self.push()
         self.set_players()
         self.players.add_player(TGUser(user))
@@ -212,14 +212,18 @@ class XO(Game):
                     if self.queue == player_game.index:
                         return self.game_xo(data)
                     return alert_text(ul_this.stop)
-                for new_index, new_sign in enumerate(tuple(self.signs)[index + 1 :]):
-                    if new_sign not in self.players:
-                        user_index = new_index + index + 1
-                        self.players.add_player_to_db(new_sign, player, user_index)
-                        self.game_xo(data, self.queue == user_index)
-                        return alert_text(ul_this.start_pl_2)
-                if player_game and player_game.user_sign == sign and player_game.index == index:
-                    return self.game_xo(data)
+
+        for index, sign in enumerate(self.signs):
+            if sign not in self.players:
+                continue
+            for new_index, new_sign in enumerate(tuple(self.signs)[index + 1 :]):
+                if new_sign not in self.players:
+                    user_index = new_index + index + 1
+                    self.players.add_player_to_db(new_sign, player, user_index)
+                    self.game_xo(data, self.queue == user_index)
+                    return alert_text(ul_this.start_pl_2)
+            if player_game and player_game.user_sign == sign and player_game.index == index:
+                return self.game_xo(data)
 
         return alert_text(ul_this.stop_game)
 
@@ -292,7 +296,7 @@ class XO(Game):
         self.push()
         self.edit_message(
             text + '\n' + self.build_game_text(self.queue),
-            self.board.game_buttons(GameType.USER, ul, choice if make_turn else None),
+            self.board.game_buttons(GameType.USER, ul, choice),
         )
 
     def timeout(self, *args, **kwargs):

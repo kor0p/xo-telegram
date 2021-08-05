@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
+from typing import Iterable, Optional
 
 
 class URLS:
@@ -113,7 +113,10 @@ class GameSigns(list):
     DEFAULT: GameSigns
     inverted_sings: list[str]
 
-    def __init__(self, signs: list[str, ...], length: int = None):
+    def __init__(self, signs: Optional[list[str, ...]] = None, length: int = None):
+        if signs is None:
+            signs = list(CONSTS.ALL_GAMES_SIGNS)
+
         HALF_LENGTH = len(signs) // 2
         if length is None:
             length = HALF_LENGTH

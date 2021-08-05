@@ -129,8 +129,15 @@ class Players:
             if sign not in self and not self.get_game_player(player):
                 return self.add_player_to_db(sign, player, index=index)
 
-    def add_player_to_db(self, sign: str, user: TGUser, index=None, action=ActionType.GAME) -> UsersGames:
+    def add_player_to_db(
+        self, sign: str, user: TGUser, index=None, action=ActionType.GAME, force_sign=False
+    ) -> Optional[UsersGames]:
         if index is None:
+            if sign not in self.possible_signs:
+                if force_sign:
+                    self.possible_signs = GameSigns(length=CONSTS.ALL_GAMES_SIGNS.index(sign) + 1)
+                else:
+                    return  # maybe must raise IndexError
             index = self.possible_signs.index(sign)
         user_game, _ = UsersGames.get_or_create(
             dict(
