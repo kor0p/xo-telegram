@@ -63,7 +63,9 @@ class TextXO(Game):
             text,
             self.id,
             self.message_id,
-            reply_markup=(self.board.end_game_buttons() if end else self.board.game_buttons(GameType.ROBOT)),
+            reply_markup=(
+                self.board.end_game_buttons() if end else self.board.game_buttons(GameType.ROBOT, self.player.lang)
+            ),
             parse_mode='HTML',
             disable_web_page_preview=True,
         )

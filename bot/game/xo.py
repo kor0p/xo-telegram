@@ -8,8 +8,18 @@ from telebot import types, logger
 from .. import database as db
 from ..boards import is_cell_free, Board, BoardBig
 from ..bot import bot
-from ..const import HOW_MANY_TO_WIN, CONSTS, GameType, ActionType, GameState, GameEndAction, Choice, GameSigns
-from ..button import inline_buttons
+from ..const import (
+    CONSTS,
+    GameType,
+    ActionType,
+    GameState,
+    GameEndAction,
+    Choice,
+    GameSigns,
+    HOW_MANY_TO_WIN,
+    POSSIBLE_SIZES_FOR_PLAYERS,
+)
+from ..button import inline_buttons, choose_game_sizes
 from ..game import Game, Players
 from ..languages import Language
 from ..user import TGUser
@@ -76,10 +86,31 @@ class XO(Game):
     def game_language(self) -> Language:
         return Language.sum(user.lang for user in self.players)
 
+    def get_current_settings(self):
+        game_language = self.game_language()
+        return (
+            f'{game_language.current_size}: {self.board.raw_size}\n{game_language.current_players}: \n'
+            + self.build_game_text(0, '')
+            + '\n'
+        )
+
     def create_base_game(self, user: types.User, sign: str):
         self.players.add_player_to_db(sign, TGUser(user), force_sign=True)
-        self.set_players()
+        self.signs = self.players.possible_signs
         self.push()
+        self.set_players()
+        possible_game_sizes = POSSIBLE_SIZES_FOR_PLAYERS[len(self.signs)]
+
+        game_language = self.game_language()
+        if not possible_game_sizes:
+            return 'ERROR'
+        if len(possible_game_sizes) == 1:
+            return self.start_game(possible_game_sizes[0])
+
+        self.edit_message(
+            self.get_current_settings() + game_language.startN,
+            choose_game_sizes(game_language, possible_game_sizes),
+        )
 
     def start_game_with_size_chosen(self, user: types.User, size: int):
         new_player = self.players.add_player(TGUser(user))
@@ -88,21 +119,27 @@ class XO(Game):
         if size == 0:
             size = next(random_list_size)
 
-        if size <= 4:
+        if len(HOW_MANY_TO_WIN[size]) == 1:
             return self.start_game(size, new_player is not None)
 
+        current_players_count = len(self.signs)
+        possible_players_count = HOW_MANY_TO_WIN[size].keys()
+        if max(possible_players_count) == current_players_count:
+            return self.start_game(size)
+
+        self.start_game(size, start_game=False)
+
         self.edit_message(
-            game_language.choose_players_count,
+            self.get_current_settings() + game_language.choose_players_count,
             inline_buttons(
                 *(
                     (players_count, callback.start_players_count.create(players_count))
-                    for players_count in HOW_MANY_TO_WIN[size].keys()
+                    for players_count in possible_players_count
+                    if players_count >= current_players_count
                 ),
                 (game_language.random, callback.start_players_count.create(0)),
             ),
         )
-
-        self.start_game(size, False, False)
 
     def start_game_with_players_count_chosen(self, user: types.User, players_count: int):
         size = self.board.raw_size
@@ -115,9 +152,9 @@ class XO(Game):
         self.set_players()
         self.players.add_player(TGUser(user))
 
-        return self.start_game(size, False)
+        return self.start_game(size)
 
-    def start_game(self, size: int, make_turn, start_game=True):
+    def start_game(self, size: int, make_turn=False, start_game=True):
         self.timeout((size ** 2) * 30, GameState.GAME)
         self.board = Board.create(self.signs, size)
         if start_game:
@@ -201,27 +238,28 @@ class XO(Game):
 
             if sign not in self.players and player_game is None:
                 self.players.add_player_to_db(sign, player, index)
+                self.queue = 0  # set first turn for X. # TODO: check why it's not 0 before start of game
                 alert_text(ul_this.start_pl_2)
                 if self.queue == index:
                     return self.game_xo(data)
                 else:
                     return
 
-            if sign in self.players:
-                if player_game and player_game.user_sign == sign:
-                    if self.queue == player_game.index:
-                        return self.game_xo(data)
-                    return alert_text(ul_this.stop)
+            if sign in self.players and player_game and player_game.user_sign == sign:
+                if self.queue == player_game.index:
+                    return self.game_xo(data)
+                return alert_text(ul_this.stop)
 
         for index, sign in enumerate(self.signs):
             if sign not in self.players:
                 continue
             for new_index, new_sign in enumerate(tuple(self.signs)[index + 1 :]):
-                if new_sign not in self.players:
-                    user_index = new_index + index + 1
-                    self.players.add_player_to_db(new_sign, player, user_index)
-                    self.game_xo(data, self.queue == user_index)
-                    return alert_text(ul_this.start_pl_2)
+                if new_sign in self.players:
+                    continue
+                user_index = new_index + index + 1
+                self.players.add_player_to_db(new_sign, player, user_index)
+                self.game_xo(data, self.queue == user_index)
+                return alert_text(ul_this.start_pl_2)
             if player_game and player_game.user_sign == sign and player_game.index == index:
                 return self.game_xo(data)
 
@@ -244,9 +282,7 @@ class XO(Game):
                 print('WTF?')
             self.players.update_user_game(action=ActionType.END)
             self.players.update_user_game(queue=self.queue, action=ActionType.GAME)
-            text += self.build_game_text(self.queue, CONSTS.LOSE, CONSTS.WIN) + ul.player.format(
-                (pg := self.players.get_game_actions(ActionType.GIVE_UP)) and pg.user.name
-            )
+            text += self.build_game_text(self.queue, CONSTS.LOSE, CONSTS.WIN) + ul.player.format(player_game.user.name)
         elif game_state == GameState.GAME:
             text += self.build_game_text(0, '')
         if index_last_turn and index_last_turn.is_outer():

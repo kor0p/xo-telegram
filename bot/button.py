@@ -2,7 +2,8 @@ from typing import Union, Sequence
 
 from telebot import types
 
-from .const import CONSTS
+from .const import CONSTS, GAME_SIZES, URLS
+from .languages import Language
 from .utils import callback
 
 
@@ -32,4 +33,12 @@ def inline_buttons(*buttons: Union[dict, Sequence[str], bool], width=3) -> types
 
 
 def main_menu_buttons(length=2):
-    return inline_buttons(*((sign, callback.text__start.create(sign)) for sign in CONSTS.DEFAULT_GAMES_SIGNS[:length]))
+    return inline_buttons(*((sign, callback.text__start.create(sign)) for sign in CONSTS.ALL_GAMES_SIGNS[:length]))
+
+
+def choose_game_sizes(language: Language, possible_sizes=GAME_SIZES):
+    return inline_buttons(
+        *((str(i), callback.start_size.create(i)) for i in GAME_SIZES if i in possible_sizes),
+        (language.random, callback.start_size.create(0)),
+        {'text': language.donate, 'url': URLS.DONATE},
+    )

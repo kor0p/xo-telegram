@@ -19,6 +19,8 @@ rules = 'Rules'
 donate = 'Donate for project'
 choose_players_count = 'Choose how many players will play'
 exception = 'Server error has occurred'
+current_size = 'Current game size'
+current_players = 'Current players'
 confirm = {
     'default': 'Confirm',
     'TIE': 'Accept tie?',

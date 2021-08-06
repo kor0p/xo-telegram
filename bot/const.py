@@ -19,8 +19,13 @@ HOW_MANY_TO_WIN = {
     8: {2: 5, 3: 4, 4: 4, 5: 4, 6: 3},
     # big boards
     4: {2: 2},
-    9: {2: 3, 3: 3},
-    16: {2: 4, 3: 3},
+    9: {2: 3, 3: 3, 4: 3},
+    16: {2: 4, 3: 4, 4: 3, 5: 3, 6: 3},
+}
+
+POSSIBLE_SIZES_FOR_PLAYERS = {
+    i: tuple(size for size, players_to_win_count in HOW_MANY_TO_WIN.items() if i in players_to_win_count)
+    for i in range(2, 7)
 }
 
 

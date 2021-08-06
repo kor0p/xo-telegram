@@ -127,7 +127,7 @@ class Board(Row):
                 if self.free(index := Choice(i, j)):
                     return index
 
-    def game_buttons(self, game_type: GameType, language=Language(), turn=None):
+    def game_buttons(self, game_type: GameType, language: Language, turn=None):
         if turn is None:
             turn = Choice()
         else:

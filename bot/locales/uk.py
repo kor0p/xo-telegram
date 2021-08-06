@@ -18,6 +18,8 @@ rules = 'Правила'
 donate = 'Підтримати проєкт'
 choose_players_count = 'Обери скільки гравців гратимуть'
 exception = 'Серверна помилка'
+current_size = 'Поточний розмір поля'
+current_players = 'Поточні гравці'
 confirm = {
     'default': 'Підтверджую',
     'TIE': 'Приймаєш нічию?',

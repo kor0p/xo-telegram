@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import random
 from typing import Union, Literal
 
 from telebot import types
 from telebot.types import CallbackQuery, InlineQuery
 
 from ..bot import bot
-from ..button import inline_buttons
-from ..const import CONSTS, URLS, GAME_SIZES, Choice, GameEndAction, GameSigns
+from ..button import choose_game_sizes
+from ..const import CONSTS, Choice, GameEndAction, GameSigns
 from ..languages import Language
 from ..game.xo import XO
 from ..utils import callback
@@ -19,17 +18,12 @@ def inline_query_handler(inline_query: InlineQuery):
     language = Language(inline_query.from_user.language_code)
     query = inline_query.query
 
-    buttons = inline_buttons(
-        *((str(i), callback.start_size.create(i)) for i in GAME_SIZES),
-        (language.random, callback.start_size.create(0)),
-        random.randint(0, 30) == 0 and {'text': language.donate, 'url': URLS.DONATE},
-        width=3,
-    )
-
     return bot.answer_inline_query(
         inline_query.id,
         (
-            types.InlineQueryResultArticle(sign, sign, types.InputTextMessageContent(language.startN), buttons)
+            types.InlineQueryResultArticle(
+                sign, sign, types.InputTextMessageContent(language.startN), choose_game_sizes(language)
+            )
             for sign in GameSigns(CONSTS.ALL_GAMES_SIGNS)
             if sign in query or not query
         ),
