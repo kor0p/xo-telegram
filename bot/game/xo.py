@@ -71,8 +71,8 @@ class XO(Game):
             self.signs,
         )
 
-    def pass_turn(self, update: int = 1):
-        self.queue = (self.queue + update) % len(self.signs)
+    def pass_turn(self):
+        self.queue = (self.queue + 1) % len(self.signs)
 
     def edit_message(self, text, reply_markup):
         return bot.edit_message_text(
@@ -113,14 +113,14 @@ class XO(Game):
         )
 
     def start_game_with_size_chosen(self, user: types.User, size: int):
-        new_player = self.players.add_player(TGUser(user))
+        self.players.add_player(TGUser(user))
         game_language = self.game_language()
 
         if size == 0:
             size = next(random_list_size)
 
         if len(HOW_MANY_TO_WIN[size]) == 1:
-            return self.start_game(size, new_player is not None)
+            return self.start_game(size)
 
         current_players_count = len(self.signs)
         possible_players_count = HOW_MANY_TO_WIN[size].keys()
@@ -154,11 +154,11 @@ class XO(Game):
 
         return self.start_game(size)
 
-    def start_game(self, size: int, make_turn=False, start_game=True):
+    def start_game(self, size: int, *, start_game=True):
         self.timeout((size ** 2) * 30, GameState.GAME)
         self.board = Board.create(self.signs, size)
         if start_game:
-            self.game_xo(None, make_turn=make_turn)
+            self.game_xo(None, False)
         else:
             self.push()
 
@@ -238,7 +238,6 @@ class XO(Game):
 
             if sign not in self.players and player_game is None:
                 self.players.add_player_to_db(sign, player, index)
-                self.queue = 0  # set first turn for X. # TODO: check why it's not 0 before start of game
                 alert_text(ul_this.start_pl_2)
                 if self.queue == index:
                     return self.game_xo(data)

@@ -113,7 +113,7 @@ class XO(Base):
 
     id = Column(String, primary_key=True)
 
-    queue = Column(Integer)
+    queue = Column(Integer, default=0)
     board = Column(String)
     deleted_at = Column(DateTime, default=None)
     signs = Column(String, default=CONSTS.DEFAULT_GAMES_SIGNS)
