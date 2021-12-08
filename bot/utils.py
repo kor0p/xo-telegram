@@ -25,10 +25,7 @@ random_list_size = get_random_list_size()
 
 
 def make_html_user_url(user: Union[TGUser, User]) -> str:
-    url = f'tg://user?id={user.id}'
-    if user.username:
-        url = f'https://t.me/{user.username}'
-    return f'<a href="{url}">{user.first_name}</a>'
+    return f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
 
 
 def _map_callback_data(row: Union[JSON_COMMON_DATA, Choice, Enum]) -> JSON_COMMON_DATA:
