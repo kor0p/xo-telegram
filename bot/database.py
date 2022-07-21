@@ -4,7 +4,7 @@ import os
 from typing import Any, Union
 
 import sqlalchemy
-from sqlalchemy import Column, ForeignKey, JSON, Text, String, Integer, DateTime, Boolean, Enum
+from sqlalchemy import Column, ForeignKey, JSON, Text, String, Integer, BigInteger, DateTime, Boolean, Enum
 from sqlalchemy.orm import scoped_session, sessionmaker, relationship, declarative_base, Session, Query
 from sqlalchemy_mixins import AllFeaturesMixin
 from sqlalchemy_mixins.utils import classproperty
@@ -90,17 +90,17 @@ class Base(declarative_base(metadata=metadata), AllFeaturesMixin):
 class TextXO(Base):
     __tablename__ = 'xo_text'
 
-    id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    id = Column(BigInteger, ForeignKey('users.id'), primary_key=True)
     is_x = Column(Boolean)
     board = Column(String)
-    message_id = Column(Integer, primary_key=True)
+    message_id = Column(BigInteger, primary_key=True)
     deleted_at = Column(DateTime, default=None)
 
 
 class UsersGames(Base):
     __tablename__ = 'users_games'
 
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    user_id = Column(BigInteger, ForeignKey('users.id'), primary_key=True)
     game_id = Column(String, ForeignKey('xo.id'), primary_key=True)
 
     index = Column(Integer)
@@ -124,7 +124,7 @@ class XO(Base):
 class Users(Base):
     __tablename__ = 'users'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     name = Column(String)
     username = Column(String)
     lang = Column(String)
@@ -153,8 +153,8 @@ class Users(Base):
 class Messages(Base):
     __tablename__ = 'messages'
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey('users.id'), primary_key=True)
     text = Column(Text)
     content_type = Column(String)
     data = Column(JSON)
