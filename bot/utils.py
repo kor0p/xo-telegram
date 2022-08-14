@@ -28,6 +28,10 @@ def make_html_user_url(user: Union[TGUser, User]) -> str:
     return f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
 
 
+class InvalidGameConfigError(Exception):
+    pass
+
+
 def _map_callback_data(row: Union[JSON_COMMON_DATA, Choice, Enum]) -> JSON_COMMON_DATA:
     if isinstance(row, Choice):
         return list(row.to_tuple())

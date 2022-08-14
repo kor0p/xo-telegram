@@ -73,7 +73,6 @@ def request_admin_support(message: Message):
         f'''user: {make_html_user_url(message.from_user)}
 text: <code>{message.text}</code>
 json: <code>{message.json}</code>''',
-        parse_mode='HTML',
     )
 
 

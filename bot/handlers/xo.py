@@ -7,7 +7,7 @@ from telebot.types import CallbackQuery, InlineQuery
 
 from ..bot import bot
 from ..button import choose_game_sizes
-from ..const import CONSTS, Choice, GameEndAction, GameSigns
+from ..const import CONSTS, Choice, GameEndAction, GameSigns, POSSIBLE_SIZES_FOR_PLAYERS
 from ..languages import Language
 from ..game.xo import XO
 from ..utils import callback
@@ -22,9 +22,12 @@ def inline_query_handler(inline_query: InlineQuery):
         inline_query.id,
         (
             types.InlineQueryResultArticle(
-                sign, sign, types.InputTextMessageContent(language.startN), choose_game_sizes(language)
+                sign,
+                sign,
+                types.InputTextMessageContent(language.startN),
+                choose_game_sizes(language, POSSIBLE_SIZES_FOR_PLAYERS[(index or 1) + 1]),
             )
-            for sign in GameSigns(CONSTS.ALL_GAMES_SIGNS)
+            for index, sign in enumerate(GameSigns(CONSTS.ALL_GAMES_SIGNS))
             if sign in query or not query
         ),
     )

@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .const import Choice
 from .database import Messages, Users
 from .languages import Language
-from .utils import JSON_COMMON_DATA
+from .utils import JSON_COMMON_DATA, InvalidGameConfigError
 
 logger.setLevel(logging.DEBUG)
 
@@ -97,4 +97,15 @@ class ExtraTeleBot(TeleBot):
         return message
 
 
-bot = ExtraTeleBot(os.environ.get('BOT_TOKEN'), threaded=False)
+class ErrorHandler:
+    def handle(self, error):
+        if isinstance(error, InvalidGameConfigError):
+            return True
+
+
+bot = ExtraTeleBot(
+    os.environ.get('BOT_TOKEN'),
+    parse_mode='HTML',
+    num_threads=8,
+    exception_handler=ErrorHandler(),
+)

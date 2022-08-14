@@ -9,7 +9,7 @@ from .languages import Language
 from .row import RowItem, Row, join
 from .button import inline_buttons
 from .const import CONSTS, HOW_MANY_TO_WIN, BIG_GAME_SIZES, URLS, GameType, GameEndAction, Choice, GameSigns
-from .utils import callback
+from .utils import callback, InvalidGameConfigError
 
 
 def is_cell_free(board_cell: str) -> bool:
@@ -73,7 +73,10 @@ class Board(Row):
 
     def check_win_for_sign(self, sign: str):
         """one system for all sizes"""
-        win_count = HOW_MANY_TO_WIN[self.raw_size][len(self.signs)]
+        try:
+            win_count = HOW_MANY_TO_WIN[self.raw_size][len(self.signs)]
+        except KeyError as e:
+            raise InvalidGameConfigError from e
 
         board = self.board_text()  # # check for first N turns:
         if board.count(sign) < win_count:  # if there is less than N count of sign -> no way to have win
