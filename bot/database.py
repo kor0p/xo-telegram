@@ -14,9 +14,8 @@ from .const import ActionType, CONSTS
 from .user import TGUser
 from .languages import Language
 
-DATABASE_URL = os.environ['DB_URL']
 engine = sqlalchemy.create_engine(
-    DATABASE_URL,
+    os.environ['DATABASE_URL'].replace('postgres://', 'postgresql://'),
     pool_size=5,
     max_overflow=2,
     pool_timeout=30,  # 30 seconds
