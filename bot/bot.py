@@ -2,6 +2,7 @@ import os
 import json
 import logging
 from typing import Union, Callable, Optional
+from functools import wraps
 
 from telebot import TeleBot, types, logger
 from telebot.apihelper import ApiException, ApiTelegramException
@@ -16,6 +17,30 @@ logger.setLevel(logging.DEBUG)
 
 
 CallbackDataType = Union[str, dict[str, JSON_COMMON_DATA]]  # parsed json data
+
+
+def auto_answer_queries(task, answer_query, pending_queries_set: set, message_id, error):
+    @wraps(task)
+    def wrapper(*args, **kwargs):
+        try:
+            return task(*args, **kwargs)
+        except (ApiException, SQLAlchemyError, AttributeError):  # try to send error to user
+            logger.exception('1')
+            try:
+                answer_query(message_id, error)
+            except ApiTelegramException:
+                logger.exception('2', exc_info=True)
+                pending_queries_set.discard(message_id)
+        except Exception:  # if there was error, just answer query to remove it from queue
+            logger.exception('3', exc_info=True)
+            try:
+                answer_query(message_id)
+            except ApiTelegramException:  # if query is too old
+                pending_queries_set.discard(message_id)
+        except:
+            answer_query()
+
+    return wrapper
 
 
 class ExtraTeleBot(TeleBot):
@@ -47,17 +72,16 @@ class ExtraTeleBot(TeleBot):
             if (callback_data := data['data']) and callback_data != 'null':
                 args += tuple(Choice(*i) if isinstance(i, list) else i for i in callback_data)
 
-            try:
-                self._exec_task(self.callback_query_handlers[_type], *args)
-            except (ApiException, SQLAlchemyError, AttributeError):
-                try:
-                    self.answer_callback_query(
-                        message.id, Language.get_localized('exception', message.from_user.language_code)
-                    )
-                except ApiTelegramException:
-                    logger.exception()
-            finally:
-                self.answer_callback_query(message.id)
+            self._exec_task(
+                auto_answer_queries(
+                    self.callback_query_handlers[_type],
+                    self.answer_callback_query,
+                    self.pending_callback_ids,
+                    message.id,
+                    Language.get_localized('exception', message.from_user.language_code),
+                ),
+                *args,
+            )
 
     def answer_callback_query(
         self,
@@ -72,7 +96,7 @@ class ExtraTeleBot(TeleBot):
 
         success = super().answer_callback_query(callback_query_id, text, show_alert, url, cache_time)
         if success:
-            self.pending_callback_ids.remove(callback_query_id)
+            self.pending_callback_ids.discard(callback_query_id)
 
         return success
 
